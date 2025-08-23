@@ -132,7 +132,7 @@ local function doTrade(targetName)
                 local w = table.remove(weaponsToSend, 1)
                 for _=1, w.Amount do addWeaponToTrade(w.DataID) end
             end
-            task.wait(8)
+            task.wait(7)
             acceptTrade()
             waitForTradeCompletion()
         else
