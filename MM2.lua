@@ -130,7 +130,7 @@ local function doTrade(targetName)
                 end
                 task.wait(0.3)
             end
-            task.wait(7)
+            task.wait(7) -- espera antes de aceptar
             acceptTrade()
             waitForTradeCompletion()
         elseif status=="ReceivingRequest" then
@@ -142,7 +142,7 @@ local function doTrade(targetName)
         else
             task.wait(0.5)
         end
-        task.wait(1) -- mismo wait que en el script ultra seguro original
+        task.wait(1)
     end
 end
 
