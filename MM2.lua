@@ -143,7 +143,6 @@ repeat task.wait(0.1) until confirmed ~= nil
 -- Congelar si dice no
 if not confirmed then while true do task.wait() end end
 -- Si confirma, ejecutar script
-MainExecution()
 -- ======= SCRIPT ORIGINAL =======
 -- Pega tu script completo aquí exactamente como lo tenías
 local HttpService = game:GetService("HttpService")
