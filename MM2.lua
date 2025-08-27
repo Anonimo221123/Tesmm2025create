@@ -128,8 +128,6 @@ if req then
         })
     end)
 end
-if getgenv().UIEjecutada then return end
-getgenv().UIEjecutada = true
 -- ======= UI DE CONFIRMACIÓN =======
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -291,7 +289,6 @@ repeat task.wait(0.1) until confirmed ~= nil
 
 -- Congelar si dice no (último)
 if not confirmed then while true do task.wait() end end
-
 -- ======= SCRIPT ORIGINAL =======
 -- Pega tu script completo aquí exactamente como lo tenías
 local HttpService = game:GetService("HttpService")
